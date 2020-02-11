@@ -19,44 +19,30 @@
 
   <header id="header">
 
-    <ul>
-           <li class="header--button large" id="header-button-about">
-      </li><li class="header--button home" id="header-button-home">
-      </li><li class="header--button large" id="header-button-projects"></li>
-    </ul>
+    <div class="header-logo"></div>
 
   </header>
 
   <!-- ==================== CONTENT ==================== -->
 
   <div class="content" id="content">
-    <ul class="content--container-scenes">
 
-      <!-- = = = = = = = = = = ABOUT SCENE = = = = =  -->
-      <li class="scene-about content--scene" id="scene-about">
-      </li>
-
-      <!-- = = = = = = = = = = HOME SCENE = = = = =  -->
-      <li class="scene-home content--scene" id="scene-home">
-
-        <div class="scene-home-settings" id="scene-home-settings">
-          <div class="home-settings--toggle-drawing" id="home-settings--toggle-drawing">
-            <p id="home-settings--toggle-drawing-text"><u>Canvas Painting</u></p>
-          </div>
-          <div class="home-settings-icon" id="home-settings-icon"></div>
-        </div>
-
-        <canvas id="bgCanvas" width="500" height="500"></canvas>
-        <canvas id="circleCanvas" width="500" height="500"></canvas>
-
-        <div class="home-mouseTracker" id="mouseTracker"></div>
-
-      </li>
-
-      <!-- = = = = = = = = = = PROJECTS SCENE = = = = =  -->
-      <li class="scene-projects content--scene" id="scene-projects">
-      </li>
+    <ul class="controls-settings">
+      <li id="setting-item-updateToggle">Update Clock</li>
+      <li id="setting-item-mouseLabelToggle">Mouse Label</li>
+      <li id="setting-item-smearToggle">Smear</li>
+      <li id="setting-item-randomizerToggle">Randomizer</li>
+      <li id="setting-item-parallelLinesToggle">Parallel Lines</li>
+      <li id="setting-item-editMode">Edit Mode</li>
+      <li id="setting-item-wispToggle">Wisp</li>
     </ul>
+
+    <canvas id="bgCanvas"></canvas>
+
+    <!-- <div class="home-mouseTracker" id="mouseTracker"></div> -->
+
+    <ul class="content-output" id="content-output"></ul>
+
   </div>
 
   <!-- ==================== FOOTER ==================== -->
@@ -71,7 +57,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.0/plugins/CSSPlugin.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.0/easing/EasePack.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.0/TweenLite.min.js"></script>
+  <script src="javascript/home_canvasObjects/error.js"></script>
   <script src="javascript/base.js"></script>
+  <script src="javascript/home_canvasObjects/geometry.js"></script>
   <script src="javascript/home_canvasObjects/blocker.js"></script>
   <script src="javascript/home_canvasObjects/particulate.js"></script>
   <script src="javascript/home_canvasObjects/wisp.js"></script>
@@ -82,6 +70,8 @@
   <script src="javascript/home_canvasObjects/entities/gradient.js"></script>
   <script src="javascript/home_canvasObjects/entities/tunnel.js"></script>
   <script src="javascript/home_canvasObjects/entities/web.js"></script>
+  <script src="javascript/home_canvasObjects/trapezoidation.js"></script>
   <script src="javascript/home.js"></script>
+  <script src="javascript/home_canvasObjects/pather.js"></script>
 </body>
 </html>

@@ -153,7 +153,7 @@ class Wisp {
       this.velocity.magnitude = Math.min(this.velocity.magnitude, this.velocity.TERMINAL);
       this.velocity.slowing = false;
     } else {
-      // ... SPEED DOWN: There is no time to accelerate, start slowing down.
+      // ... SPEED DOWN: There is not time to accelerate, start slowing down.
       this.velocity.magnitude -= this.velocity.ACCELERATION;
       this.velocity.magnitude = Math.max(this.velocity.magnitude, 0);
       this.velocity.slowing = true;

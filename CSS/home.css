@@ -2,161 +2,78 @@
 /* CSS Document */
 
 canvas {
-	position: absolute;
-	overflow: hidden;
-}
-.home-mouseTracker {
-	/*background: url("../images/hxr-logoFancy2@2x.png") no-repeat center/165px;*/
+	border: 1px solid var(--color-background);
+	float: left;
 	height: 100%;
-	position: absolute;
-	width: 33.29%;
-}
-
-.scene-home {
-	/*background: url("../images/hxr-logoFancy2@2x.png") no-repeat center/165px;*/
-}
-
-.scene-home-button-style {
-	background-color: var(--color-background);
-	border-radius: 50%;
-	box-shadow: 0 0 4px 0 black;
-	display: block;
-	height: 80px;
-	left: 50%;
 	margin: 0;
-	overflow: hidden;
-	position: absolute;
-	top: 50%;
-	transform: translate(-50%, -50%);
-	width: 80px;
+	padding: 0;
+	width: 60%;
 }
 
-.scene-home-button-style-overlay {
-	background: url("../images/overlay_orbStyle@2x.png") no-repeat center/contain;
+/* - - - - - - - - - CONTROLS - - - - - - - - - */
+
+.controls-settings {
+	cursor: default;
 	display: block;
-	height: 100px;
-	left: 50%;
+	list-style: none;
+	height: 20px;
 	margin: 0;
-	position: absolute;
-	top: 50%;
-	transform: translate(-50%, -50%);
-	width: 100px;
-	z-index: 1;
+	overflow-x: scroll;
+	overflow-y: hidden;
+	padding: 0;
+	width: 100%;
 }
 
-.scene-home-button-style canvas {
-
-}
-
-.scene-home-info {
-	bottom: 0;
-	display: inline-block;
-	height: 30px;
-	margin: 6px;
-	overflow: hidden;
-	padding: 0 0 0 26px;
-	position: absolute;
-	right: 33.333%;
+.controls-settings::-webkit-scrollbar {
+	height: 0;
 	width: 0;
-	z-index: 3;
 }
 
-.home-info-container {
-	bottom: 0;
-	display: inline-block;
-	height: 86px;
-	margin: 0;
-	padding: 0 20px 0 0;
-	position: absolute;
-	right: 0;
-	text-align: left;
-	width: 290px;
-}
-
-.info-container-icon {
-	display: inline-block;
-	height: 24px;
-	width: 50px;
-}
-
-.icon-clickMouse {
-	background: url("../images/icon_info_moveMouse@2x.png") no-repeat bottom right/contain;
-}
-.icon-moveMouse {
-	background: url("../images/icon_info_clickMouse@2x.png") no-repeat bottom right/contain;
-}
-.icon-spacebar {
-	background: url("../images/icon_info_spacebar@2x.png") no-repeat bottom right/contain;
-}
-
-.home-info-icon {
-	bottom: 0;
-	color: var(--color-background);
-	cursor: default;
-	display: inline;
-	font-weight: bolder;
-	font-size: 30px;
-	left: 0;
-	margin: 0;
-	padding: 0;
-	position: absolute;
-}
-
-.home-info-text {
-	color: var(--color-background);
-	cursor: default;
-	display: inline;
-	margin: 0;
-	padding: 0;
-}
-
-.scene-home-settings {
-	bottom: 0;
-	display: block;
-	height: 25px;
-	margin: 5px;
-	overflow: hidden;
-	padding: 0;
-	position: absolute;
-	text-align: right;
-	width: 25px;
-	z-index: 3;
-}
-
-.home-settings-icon {
-	background: url("../images/icon_settings@2x.png") no-repeat right center/contain;
-	display: block;
-	height: 25px;
-	margin: 0;
-	overflow-x: hidden;
-	padding: 0;
-	position: absolute;
-	right: 0;
-	width: 25px;
-}
-
-.home-settings--toggle-drawing {
+.controls-settings li {
+	background: url("../images/icon_settings_x@2x.png") no-repeat left center/contain;
 	color: var(--color-background);
 	cursor: pointer;
-	height: 25px;
-  left: 0;
-  margin: 0;
-	overflow: hidden;
-  padding: 0;
-  position: absolute;
-	top: 0;
-  width: 0;
+	display: inline;
+	font-size: 12px;
+	/* height: 18px; */
+	line-height: 18px;
+	margin: 1px 0 8px 4px;
+	padding: 0 0 0 22px;
+	/* width: 100px; */
 }
-.home-settings--toggle-drawing:active {
-  color: var(--color-mediant);
+.controls-settings li:hover {
+	text-decoration: underline;
 }
 
-.home-settings--toggle-drawing p {
-  display: absolute;
-  font-size: 12px;
-	height: 25px;
-  line-height: 25px;
-  margin: 0;
-	text-align: left;
-	white-space: nowrap;
+#setting-item-smearToggle {
+  	background-image: url("../images/icon_settings@2x.png");
+}
+#setting-item-randomizerToggle {
+	background-image: url("../images/icon_settings@2x.png");
+}
+#setting-item-editMode {
+	background-image: url("../images/icon_settings@2x.png");
+}
+
+/* - - - - - - - - OUT - - - - - - - - */
+
+.content-output {
+	border: 1px solid var(--color-background);
+	border-left: 0px;
+	font-size: 10px;
+	list-style: none;
+	height: 100%;
+	margin: 0;
+	overflow: scroll;
+	padding: 0;
+}
+
+.content-output li {
+	border-bottom: 1px solid lightgrey;
+	opacity: 0.75;
+	padding: 6px 0 6px 2px;
+	white-space: pre;
+}
+.content-output li:hover {
+	background-color: lightgrey;
 }

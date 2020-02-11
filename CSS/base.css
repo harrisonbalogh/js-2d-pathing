@@ -27,51 +27,19 @@ body {
 header {
   background-color: var(--color-background);
   height: 38px;
-  margin: 0;
   overflow: hidden;
   position: fixed;
-  top: 0;
   width: 100%;
 }
-
-header ul {
-  display: table;
-  list-style-type: none;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  width: 100%;
-}
-
-.header--button {
-  border: 1px solid transparent;
-  border-bottom-style: hidden;
-  border-radius: 6px 6px 0 0;
-  display: table-cell;
-  height: 100%;
-  text-align: center;
-  vertical-align: middle;
-}
-
-.header--button p {
-  color: var(--color-text);
-  display: block;
-  margin: 0;
-  padding: 9px 0;
-}
-
-.header--button.large {
-	width: 42%;
-}
-
-.header--button.home {
+.header-logo {
   background: url("../images/hxr-logo-active@2x.png") no-repeat center/103px;
   background-color: var(--color-foreground);
+  border-radius: 6px;
   display: block;
-  height: 100%;
-  margin: 0 auto;
-  min-width: 103px;
+  height: 80%;
+  margin: 4px auto;
   padding: 0 4px;
+  width: 103px;
 }
 
 /* - - - - - - - - - CONTENT - - - - - - - - - */
@@ -79,37 +47,13 @@ header ul {
 .content {
   background-color: var(--color-foreground);
   bottom: 38px;
-  display: -webkit-box;
-  display: -moz-box;
-  display: -ms-flexbox;
-  display: -webkit-flex;
-  display: flex;
+  left: 0;
   margin: 0;
   overflow: hidden;
-  padding: 0;
+  padding: 40px;
   position: fixed;
-  left: -100%;
+  right: 0;
   top: 38px;
-  width: 300%;
-}
-
-.content--container-scenes {
-  align-items: stretch;
-  display: flex;
-	list-style-type: none;
-  margin: 0;
-  overflow: hidden;
-	padding: 0;
-  width: 100%;
-}
-
-.content--scene {
-  align-items: stretch;
-  list-style-type: none;
-  margin: 0;
-  overflow: hidden;
-  padding: 0;
-  width: 33.333%;
 }
 
 /* - - - - - - - - - FOOTER - - - - - - - - - */

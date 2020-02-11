@@ -1,0 +1,48 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1671\cocoasubrtf100
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww13800\viewh6960\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 \
+Shape cases:\
+\
+Note: All shapes are expanded by a constant value. So visually shapes may not overlap, but their expanded forms do. When referring to shapes, this document refers to the expanded shape, not the original shape it was expanded from.\
+\
+\'95 Shape A and B do not overlap.\
+\'95 Shape A and B overlap, but neither encompasses the other.\
+\'95 Shape A or B encompasses the other.\
+\
+\
+\
+\
+\
+\
+\
+Go through DOM.\
+\
+Start with all objects in body block.\
+Perhaps check if they're a div.\
+	- Or check if theyre a div plus have a border and/or box-shadow\
+	Basically trying to check if there is a visual delineation.\
+	\
+Maybe it can only move on elements that have a certain color background?\
+	- Like if they actually use var(--color-background).\
+\
+Or can only move on divs that are marked with a certain class name. So I can add\
+a certain class tag to anything that the wisp can move on, and anything else is a blocker.\
+	- So then you just find everything with that class name tag, and then go through all of its children\
+	elements to create your blockers.\
+	- This would be reasonable because it can basically only move on the upper most background container.\
+	- Then you have to figure out:\
+\
+	If it can operate only on containers that are split from each other..... it would have to know how to island hop.\
+	And be aware of a boundary that it cannot move out of.\
+\
+	- Instead maybe we define the 'content' super container div as the only space it can move on. And then any of its\
+	children are to be avoided.\
+		- But then the wisp needs to know when a location is not accessible. So it has to do a "phase" move.\
+\
+\
+	}
