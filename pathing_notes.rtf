@@ -24,25 +24,25 @@ Go through DOM.\
 \
 Start with all objects in body block.\
 Perhaps check if they're a div.\
-	- Or check if theyre a div plus have a border and/or box-shadow\
-	Basically trying to check if there is a visual delineation.\
-	\
+  - Or check if theyre a div plus have a border and/or box-shadow\
+  Basically trying to check if there is a visual delineation.\
+  \
 Maybe it can only move on elements that have a certain color background?\
-	- Like if they actually use var(--color-background).\
+  - Like if they actually use var(--color-background).\
 \
 Or can only move on divs that are marked with a certain class name. So I can add\
 a certain class tag to anything that the wisp can move on, and anything else is a blocker.\
-	- So then you just find everything with that class name tag, and then go through all of its children\
-	elements to create your blockers.\
-	- This would be reasonable because it can basically only move on the upper most background container.\
-	- Then you have to figure out:\
+  - So then you just find everything with that class name tag, and then go through all of its children\
+  elements to create your blockers.\
+  - This would be reasonable because it can basically only move on the upper most background container.\
+  - Then you have to figure out:\
 \
-	If it can operate only on containers that are split from each other..... it would have to know how to island hop.\
-	And be aware of a boundary that it cannot move out of.\
+  If it can operate only on containers that are split from each other..... it would have to know how to island hop.\
+  And be aware of a boundary that it cannot move out of.\
 \
-	- Instead maybe we define the 'content' super container div as the only space it can move on. And then any of its\
-	children are to be avoided.\
-		- But then the wisp needs to know when a location is not accessible. So it has to do a "phase" move.\
+  - Instead maybe we define the 'content' super container div as the only space it can move on. And then any of its\
+  children are to be avoided.\
+    - But then the wisp needs to know when a location is not accessible. So it has to do a "phase" move.\
 \
 \
-	}
+  }

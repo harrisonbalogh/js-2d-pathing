@@ -475,8 +475,8 @@ class Wisp {
       for (var ind = 0; ind < (visibleVerticesX.length-1); ind++) {
         this.context.strokeStyle = "Black";
         this.context.beginPath();
-    		this.context.moveTo(visibleVerticesX[ind], visibleVerticesY[ind]);
-    		this.context.lineTo(visibleVerticesX[ind+1], visibleVerticesY[ind+1]);
+        this.context.moveTo(visibleVerticesX[ind], visibleVerticesY[ind]);
+        this.context.lineTo(visibleVerticesX[ind+1], visibleVerticesY[ind+1]);
         this.context.stroke();
       }
       this.context.strokeStyle = "Black";

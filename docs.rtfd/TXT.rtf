@@ -11,7 +11,7 @@
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
 \f0\b\fs18 \cf0 Layout
-\f1\b0  - An array of 
+\f1\b0  - An array of
 \f2\i Blocker
 \f1\i0  objects.\
 
@@ -37,34 +37,34 @@
 \f0\b 0. Prerequisite\
 
 \f1\b0 - Verify the destination is not inside a blocker. If it is, find the closest point outside of this blocker.\
-		
+
 \f0\b *
-\f1\b0  Checking if a point is located inside a blocker currently only works on 		convex shapes (of any vertex count) since it draws a ray to each vertex in 		the blocker and ensures that all these rays are not intersected by a side of 		the blocker (basically a visibility check performed in step 
+\f1\b0  Checking if a point is located inside a blocker currently only works on     convex shapes (of any vertex count) since it draws a ray to each vertex in     the blocker and ensures that all these rays are not intersected by a side of     the blocker (basically a visibility check performed in step
 \f2\i 4. Routing
-\f1\i0 ). This 		might be not be true - I may have implemented better algorithm to fix this.\
+\f1\i0 ). This     might be not be true - I may have implemented better algorithm to fix this.\
 
 \f0\b \
 1. Layout Review
 \f1\b0 \
 - Iterate through all blockers in the layout and use preliminary checks to determine which blockers are likely to be in the way of the target. There are several cases to be tested.\
-	
+
 \f3\i\b\fs22 Case 1
 \f1\i0\b0\fs24 : Line to target intersects a circle.\
-	This is calculated using line projections and relative distance checks (does not 	use square roots).\
-	
+  This is calculated using line projections and relative distance checks (does not   use square roots).\
+
 \f3\i\b\fs22 Case 2
-\f1\i0\b0\fs24 : The 
+\f1\i0\b0\fs24 : The
 \f0\b start
 \f1\b0  point is inside a blocker's circle collider.\
-	The circle collider is the smallest circle that can encapsulate all vertices of the 	blocker. So a simple check of distance between start and center of blocker will\
-	tell if this blocker may have a stray vertex (forming the side of a blocker) in the 	path of the destination. A further check will be performed to ensure the start 	position is not inside a blocker itself - this will cause the blocker to be ignored 	completely so that the path may exit the blocker.\
-	
+  The circle collider is the smallest circle that can encapsulate all vertices of the   blocker. So a simple check of distance between start and center of blocker will\
+  tell if this blocker may have a stray vertex (forming the side of a blocker) in the   path of the destination. A further check will be performed to ensure the start   position is not inside a blocker itself - this will cause the blocker to be ignored   completely so that the path may exit the blocker.\
+
 \f3\i\b\fs22 Case 3
-\f1\i0\b0\fs24 : The 
+\f1\i0\b0\fs24 : The
 \f0\b target
 \f1\b0  point is inside a blockers circle collider.\
-	Since our intersection check does not return true if the circle collider's center 	point is farther than the distance from start to target, we need to do a manual 	check and add the blocker if the target point is inside the circle collider's radius.\
-	Two further calculations are performed in this case...\
+  Since our intersection check does not return true if the circle collider's center   point is farther than the distance from start to target, we need to do a manual   check and add the blocker if the target point is inside the circle collider's radius.\
+  Two further calculations are performed in this case...\
 \
 
 \f0\b 2. Precision Check
@@ -77,7 +77,7 @@
 
 \f0\b 4. Routing
 \f1\b0 \
-- Determine all vertices of the closest blocker found in the 
+- Determine all vertices of the closest blocker found in the
 \f2\i 2. Precision Check
 \f1\i0  step that are visible to the start point. That is to say, if a ray can be drawn without piercing any of the sides of the closest blocker to the start point, then it is visible to the start point. From these visible vertices, form a width bounds. This bound is 2 points that indicate the farthest "above" and "below" (these terms are relative and simply used to label the 2 potential paths in such a 2D environment) the start point could take to get around the blocker's visible sides. Which path to take is determined by adding the distance from the start point to the vertex plus the distance from the vertex to the target destination (for each side). This step produces the closest point to get around the most immediate blocker. This point is set as the 'target' point and the algorithm is re-run with this new target. We will call this "algorithm re-run" an Intercalary Routing iteration. The 'start' point can only advance (and a new waypoint added) if this target point has nothing in its way.\
 
@@ -93,38 +93,38 @@
 \f0\b \cf0 Reference 1:
 \f1\b0 \
 Point of segment intersection:\
-	https://github.com/pgkelley4/line-segments-intersect/blob/master/js/line-segments-intersect.js\
+  https://github.com/pgkelley4/line-segments-intersect/blob/master/js/line-segments-intersect.js\
 
 \f0\b Reference 2:
 \f1\b0 \
 Point in polygon:\
-	https://www.geeksforgeeks.org/how-to-check-if-a-given-point-lies-inside-a-polygon/\
+  https://www.geeksforgeeks.org/how-to-check-if-a-given-point-lies-inside-a-polygon/\
 
 \f0\b Reference 3:
 \f1\b0 \
 Segment intersection:\
-	https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/\
+  https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/\
 \
 \
 \
 To-Do: \
-	
+
 \f0\b -\'9b
-\f1\b0  If all visible vertices are all on one side, then choose the shortest distance 	(distance of perpendicular line from projection point).\
-	
+\f1\b0  If all visible vertices are all on one side, then choose the shortest distance   (distance of perpendicular line from projection point).\
+
 \f0\b -\'9b
-\f1\b0  Check if destination is in the hole of a blocker. If start point is not in hole, but 	destination is, then find nearest point outside of polygon (basically treating the 	hole as filled in space). If target and destination are inside the hole, we can 	ignore the polygon and \
-	
+\f1\b0  Check if destination is in the hole of a blocker. If start point is not in hole, but   destination is, then find nearest point outside of polygon (basically treating the   hole as filled in space). If target and destination are inside the hole, we can   ignore the polygon and \
+
 \f0\b -\'9b
-\f1\b0  If a polygon does not have intersection points with a peer, it could still be 	encompassed inside another blocker. First check if the peer has holes, and then 	check for intersections there. This would make the hole smaller.\
-	
+\f1\b0  If a polygon does not have intersection points with a peer, it could still be   encompassed inside another blocker. First check if the peer has holes, and then   check for intersections there. This would make the hole smaller.\
+
 \f0\b -\'9b
-\f1\b0  If all points are inside a hole, it's fine to be created. Since we already checked 	if the new polygon intersected a hole, and it didn't have all its points inside the 	hole, its creation can be ignored since it is consumed by the encompassing 	blocker.\
-	
-\f0\b -\'9b 
+\f1\b0  If all points are inside a hole, it's fine to be created. Since we already checked   if the new polygon intersected a hole, and it didn't have all its points inside the   hole, its creation can be ignored since it is consumed by the encompassing   blocker.\
+
+\f0\b -\'9b
 \f1\b0 Conjoined shapes don't seem to give the correct 'nearest exit point'.\
-	
-\f0\b -\'9b 
+
+\f0\b -\'9b
 \f1\b0 Pathing in a hole. \
 \
 * Only create convex polygons. Then expansion is reliable. Then they can be conjoined into any concave shape. (Interior angles < 180\'b0)\
@@ -159,14 +159,14 @@ To-Do: \
 \
 \
 geometry.js\
-	
+
 \f0\b extrudeVertices
 \f1\b0 (vertices, extrude)\
-	- A vertex is connected to two edges. If we traverse the array of vertices (which 	forms a polygon) in a clockwise fashion, the angle formed by the two edges 	should be the interior of the polygon. Calculating this angle is best done by taking 	the dot product of the two vectors (after being normalized) and then taking the 	Arccos. The idea trying to be achieved is shown below...\
-	\
+  - A vertex is connected to two edges. If we traverse the array of vertices (which   forms a polygon) in a clockwise fashion, the angle formed by the two edges   should be the interior of the polygon. Calculating this angle is best done by taking   the dot product of the two vectors (after being normalized) and then taking the   Arccos. The idea trying to be achieved is shown below...\
+  \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\qc\partightenfactor0
 \cf0 {{\NeXTGraphic extrude_approx@2x.png \width8000 \height8980 \appleattachmentpadding0 \appleembedtype0 \appleaqc
-}¬}\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\qc\partightenfactor0
+}ï¿½}\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\qc\partightenfactor0
 \cf0 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 \cf0 \
@@ -178,10 +178,10 @@ geometry.js\
 Working with visibility:\
 - Path is determined.\
 - Continually ensure nothing is in the way of destination.\
-	- If something is, recalculate path.\
+  - If something is, recalculate path.\
 - Would want objects with velocity to be avoided as well.\
-	- If something is going to be in the way, wait for it to pass or avoid it.\
-	- Then recalculate path.\
+  - If something is going to be in the way, wait for it to pass or avoid it.\
+  - Then recalculate path.\
 \
 \
 \
@@ -206,7 +206,7 @@ So to fix the issue, I created a much more powerful logging system. Effectively 
 Now the parallel line controls do not jump around and it will no longer get caught on corners. There is one more bug to correct...\
 \pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
 \cf0 {{\NeXTGraphic Screen Shot 2018-05-04 at 2.59.10 PM.png \width2000 \height6180 \appleattachmentpadding0 \appleembedtype0 \appleaqc
-}¬}\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+}ï¿½}\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
 \cf0 \
 \
 \
@@ -236,4 +236,4 @@ Also note a perpetual flaw with the system: \
 \
 \
 {{\NeXTGraphic Screen Shot 2018-05-04 at 2.59.15 PM.png \width1800 \height6490 \appleattachmentpadding0 \appleembedtype0 \appleaqc
-}¬}}
+}ï¿½}}

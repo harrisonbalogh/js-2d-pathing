@@ -2,78 +2,78 @@
 /* CSS Document */
 
 canvas {
-	border: 1px solid var(--color-background);
-	float: left;
-	height: 100%;
-	margin: 0;
-	padding: 0;
-	width: 60%;
+  border: 1px solid var(--color-background);
+  float: left;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  width: 60%;
 }
 
 /* - - - - - - - - - CONTROLS - - - - - - - - - */
 
 .controls-settings {
-	cursor: default;
-	display: block;
-	list-style: none;
-	height: 20px;
-	margin: 0;
-	overflow-x: scroll;
-	overflow-y: hidden;
-	padding: 0;
-	width: 100%;
+  cursor: default;
+  display: block;
+  list-style: none;
+  height: 20px;
+  margin: 0;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  padding: 0;
+  width: 100%;
 }
 
 .controls-settings::-webkit-scrollbar {
-	height: 0;
-	width: 0;
+  height: 0;
+  width: 0;
 }
 
 .controls-settings li {
-	background: url("../images/icon_settings_x@2x.png") no-repeat left center/contain;
-	color: var(--color-background);
-	cursor: pointer;
-	display: inline;
-	font-size: 12px;
-	/* height: 18px; */
-	line-height: 18px;
-	margin: 1px 0 8px 4px;
-	padding: 0 0 0 22px;
-	/* width: 100px; */
+  background: url("../images/icon_settings_x@2x.png") no-repeat left center/contain;
+  color: var(--color-background);
+  cursor: pointer;
+  display: inline;
+  font-size: 12px;
+  /* height: 18px; */
+  line-height: 18px;
+  margin: 1px 0 8px 4px;
+  padding: 0 0 0 22px;
+  /* width: 100px; */
 }
 .controls-settings li:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 #setting-item-smearToggle {
-  	background-image: url("../images/icon_settings@2x.png");
+    background-image: url("../images/icon_settings@2x.png");
 }
 #setting-item-randomizerToggle {
-	background-image: url("../images/icon_settings@2x.png");
+  background-image: url("../images/icon_settings@2x.png");
 }
 #setting-item-editMode {
-	background-image: url("../images/icon_settings@2x.png");
+  background-image: url("../images/icon_settings@2x.png");
 }
 
 /* - - - - - - - - OUT - - - - - - - - */
 
 .content-output {
-	border: 1px solid var(--color-background);
-	border-left: 0px;
-	font-size: 10px;
-	list-style: none;
-	height: 100%;
-	margin: 0;
-	overflow: scroll;
-	padding: 0;
+  border: 1px solid var(--color-background);
+  border-left: 0px;
+  font-size: 10px;
+  list-style: none;
+  height: 100%;
+  margin: 0;
+  overflow: scroll;
+  padding: 0;
 }
 
 .content-output li {
-	border-bottom: 1px solid lightgrey;
-	opacity: 0.75;
-	padding: 6px 0 6px 2px;
-	white-space: pre;
+  border-bottom: 1px solid lightgrey;
+  opacity: 0.75;
+  padding: 6px 0 6px 2px;
+  white-space: pre;
 }
 .content-output li:hover {
-	background-color: lightgrey;
+  background-color: lightgrey;
 }
