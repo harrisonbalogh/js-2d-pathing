@@ -1,3 +1,4 @@
 var Error = {
-    InvalidParameter = "invalid parameter"
+    InvalidParameter: "invalid parameter",
+    ConstructorArgument: "invalid constructor argument"
 }

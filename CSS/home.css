@@ -3,23 +3,29 @@
 
 canvas {
   border: 1px solid var(--color-background);
-  float: left;
   height: 100%;
   margin: 0;
   padding: 0;
-  width: 60%;
+  width: 80%;
+}
+
+#dev-pane {
+  border: 1px solid var(--color-background);
+  border-left: 0px;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  height: 100%;
+  width: 100%;
 }
 
 /* - - - - - - - - - CONTROLS - - - - - - - - - */
 
 .controls-settings {
+  border-bottom: 1px solid black;
   cursor: default;
-  display: block;
   list-style: none;
-  height: 20px;
   margin: 0;
-  overflow-x: scroll;
-  overflow-y: hidden;
   padding: 0;
   width: 100%;
 }
@@ -30,41 +36,31 @@ canvas {
 }
 
 .controls-settings li {
-  background: url("../images/icon_settings_x@2x.png") no-repeat left center/contain;
+  background: url("../images/icon_settings@2x.png") no-repeat left center/16px;
+  border-radius: 12px;
   color: var(--color-background);
   cursor: pointer;
-  display: inline;
   font-size: 12px;
-  /* height: 18px; */
-  line-height: 18px;
-  margin: 1px 0 8px 4px;
+  line-height: 26px;
+  margin: 1px 6px 8px 6px;
   padding: 0 0 0 22px;
-  /* width: 100px; */
 }
 .controls-settings li:hover {
   text-decoration: underline;
 }
-
-#setting-item-smearToggle {
-    background-image: url("../images/icon_settings@2x.png");
-}
-#setting-item-randomizerToggle {
-  background-image: url("../images/icon_settings@2x.png");
-}
-#setting-item-editMode {
-  background-image: url("../images/icon_settings@2x.png");
+.controls-settings li.active {
+  background-image: url("../images/icon_settings_x@2x.png");
+  background-color: lightgray;
 }
 
 /* - - - - - - - - OUT - - - - - - - - */
 
 .content-output {
-  border: 1px solid var(--color-background);
-  border-left: 0px;
   font-size: 10px;
+  display: inline;
   list-style: none;
-  height: 100%;
   margin: 0;
-  overflow: scroll;
+  overflow: auto;
   padding: 0;
 }
 
@@ -76,4 +72,17 @@ canvas {
 }
 .content-output li:hover {
   background-color: lightgrey;
+}
+
+#content-output-resizer {
+  background-color: lightgray;
+  border: 1px solid var(--color-background);
+  border-left: 0;
+  /* border-right: 0; */
+  cursor: ew-resize;
+  display: inline-block;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  width: 5px;
 }
