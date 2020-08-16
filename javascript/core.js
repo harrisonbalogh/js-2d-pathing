@@ -1,40 +1,44 @@
-// Classes in JavaScript are not hoisted. All other variables/functions are lifted to the top of their scope for order-less reference
-// So order matters for 'class' declarations
-// ==================================================================================================================== Variables =====
+import './Layout2D/Error.js'
+import { Point } from './Layout2D/Geometry.js'
+import * as Layout from './Layout2D/Layout.js'
+import { renderLogData, disableLogging, setup as logSetup } from './log.js'
 
+// Classes in JavaScript are not hoisted! Variables/functions are lifted to the top of their scope for order-less reference
+// ==================================================================================================================== Variables =====
 let RENDER_HERTZ = 1000 / 60 // Render update speed
 const RENDER_SCALING = 2
 let canvasRunning = true // when the GUI setting is enabled or not. Override drawing.
 let canvasUpdating = false // if update has yet to resume
 let canvasFlush = true // if drawing frames are cleared or retained
-let canvas_bg = document.getElementById("bgCanvas");
+let canvas_bg = document.getElementById("bgCanvas")
 let canvasMasterContext = canvas_bg.getContext('2d') // The primary canvas particles are drawn on
-let draggingParallelLines = false;
-let showingParallelSetters = false;
-let usingTopParallelSetter = false;
-let usingLeftParallelSetter = false;
-let origin = new Point(0, 0);
-let to = new Point(0, 0);
-let boundsBlocker = undefined
-let mouse = new Point(0, 0)
+let parallelBarsVisible = false;
+let parallelBarDragging = {top: false, left: false}
+let IS_BOUNDS_BLOCKER = true
+let mouse = {
+  loc: new Point(0, 0),
+  lastLeftClick: new Point(0, 0),
+  lastRightClick: new Point(0, 0)
+}
 let mouseLabelsVisible = true;
 let editingBlockers = false;
+let editingBlockersSmooth = false;
+let editingBlockersSmoothTracking = false;
 let gridify = false;
-let optimizeGridify = false;
 
 canvas_bg.width = RENDER_SCALING * canvas_bg.offsetWidth;
 canvas_bg.height = RENDER_SCALING * canvas_bg.offsetHeight;
 
 // ================================================================================================ Settings Initialization =====
-// document.getElementById('setting-item-updateToggle').onclick = toggleCanvasRunning
 document.getElementById('setting-item-updateToggle').onclick = function(){settingToggle(this, toggleCanvasRunning)}
 document.getElementById('setting-item-mouseLabelToggle').onclick = function(){settingToggle(this, toggleMouseLabel)}
 document.getElementById('setting-item-smearToggle').onclick = function(){settingToggle(this, toggleSmearRendering)}
 document.getElementById('setting-item-randomizerToggle').onclick = function(){settingToggle(this, toggleRandomizer)}
 document.getElementById('setting-item-parallelLinesToggle').onclick = function(){settingToggle(this, toggleParallelLines)}
 document.getElementById('setting-item-editMode').onclick = function(){settingToggle(this, toggleEditMode)}
+document.getElementById('setting-item-editMode-smooth').onclick = function(){settingToggle(this, toggleEditModeSmooth)}
 document.getElementById('setting-item-gridified').onclick = function(){settingToggle(this, toggleGridified)}
-document.getElementById('setting-item-optimize').onclick = function(){settingToggle(this, toggleOptimizeGrid)}
+document.getElementById('setting-item-gridified-optimize').onclick = function(){settingToggle(this, toggleOptimizeGrid)}
 
 function settingToggle(elem, logic) {
   elem.className = elem.className == "active" ? "" : "active"
@@ -42,6 +46,7 @@ function settingToggle(elem, logic) {
 }
 function toggleCanvasRunning() {
   canvasRunning = !canvasRunning
+  document.getElementById('setting-item-updateToggle').className = document.getElementById('setting-item-updateToggle').className == "active" ? "" : "active"
   if (!canvasUpdating && canvasRunning) update()
 }
 function toggleMouseLabel() {
@@ -52,26 +57,37 @@ function toggleSmearRendering() {
 }
 function toggleRandomizer() {
   randomizingPaths = !randomizingPaths;
+  disableLogging(randomizingPaths)
   clearTimeout(randomizerClock);
   if (randomizingPaths) randomizeMousePoint();
 }
 function toggleParallelLines() {
-  showingParallelSetters = !showingParallelSetters
+  parallelBarsVisible = !parallelBarsVisible
 }
 function toggleEditMode() {
   editingBlockers = !editingBlockers
   if (!editingBlockers) {
-    Blocker.finishConstruction(true)
-    if (gridify) generateGrid()
+    Layout.clearConstruction()
   }
+  let smoothClass = 'setting-sub' + (editingBlockersSmooth ? ' active' : '') + (editingBlockers ? '' : ' hidden')
+  document.getElementById('setting-item-editMode-smooth').className = smoothClass
+}
+function toggleEditModeSmooth() {
+  editingBlockersSmooth = !editingBlockersSmooth
+  let smoothClass = 'setting-sub' + (editingBlockersSmooth ? ' active' : '') + (editingBlockers ? '' : ' hidden')
+  document.getElementById('setting-item-editMode-smooth').className = smoothClass
 }
 function toggleGridified() {
   gridify = !gridify;
-  if (gridify) generateGrid()
+
+  let optimizeClass = 'setting-sub' + (Layout.optimizeTriangulation ? ' active' : '') + (gridify ? '' : ' hidden')
+  document.getElementById('setting-item-gridified-optimize').className = optimizeClass
 }
 function toggleOptimizeGrid() {
-  optimizeGridify = !optimizeGridify
-  if (gridify) generateGrid()
+  Layout.triangulationOptimized(!Layout.optimizeTriangulation)
+
+  let optimizeClass = 'setting-sub' + (Layout.optimizeTriangulation ? ' active' : '') + (gridify ? '' : ' hidden')
+  document.getElementById('setting-item-gridified-optimize').className = optimizeClass
 }
 
 // =================================================================================================================== Test stuff =====
@@ -80,9 +96,10 @@ let test_lines = [];
 let test_circles = [];
 let test_polygons = [];
 let contentOut = document.getElementById("content-output")
+logSetup(contentOut)
 let contentOutScrolling = false
 let contentOutTrackLastMouseMove = 0
-let print_data = []
+
 const RANDOMIZER_HERTZ = 0.05 * 1000;
 let randomizerClock = null;
 let randomizingPaths = false;
@@ -92,14 +109,14 @@ function randomizeMousePoint() {
   if (!randomizingPaths) return
 
   lastSideChosen = (lastSideChosen + 1 + Math.floor(Math.random() * 2)) % 4;
-  mouse = new Point(Math.floor(Math.random() * canvas_bg.width), Math.floor(Math.random() * canvas_bg.height))
+  mouse.loc = new Point(Math.floor(Math.random() * canvas_bg.width), Math.floor(Math.random() * canvas_bg.height))
 
-  if (lastSideChosen == 0) mouse.y = 0
-  else if (lastSideChosen == 1) mouse.x = canvas_bg.width
-  else if (lastSideChosen == 2) mouse.y = canvas_bg.height
-  else if (lastSideChosen == 3) mouse.x = 0
-  origin = new Point(to.x, to.y);
-  to = new Point(mouse.x, mouse.y)
+  if (lastSideChosen == 0) mouse.loc.y = 0
+  else if (lastSideChosen == 1) mouse.loc.x = canvas_bg.width
+  else if (lastSideChosen == 2) mouse.loc.y = canvas_bg.height
+  else if (lastSideChosen == 3) mouse.loc.x = 0
+  mouse.lastLeftClick = new Point(mouse.lastRightClick.x, mouse.lastRightClick.y);
+  mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
 
   randomizerClock = setTimeout(() => { randomizeMousePoint(); }, RANDOMIZER_HERTZ);
 }
@@ -138,9 +155,9 @@ function renderTestShapes() {
   if (mouseLabelsVisible) {
     canvasMasterContext.fillStyle = "black"
     canvasMasterContext.font = '20px sans-serif';
-    canvasMasterContext.fillText(mouse.x+', '+mouse.y, mouse.x+5, mouse.y-5);
+    canvasMasterContext.fillText(mouse.loc.x+', '+mouse.loc.y, mouse.loc.x+5, mouse.loc.y-5);
   }
-  if (showingParallelSetters) {
+  if (parallelBarsVisible) {
     let tSX = 80; // topSetterX    // Inversed for left setter
     let tSY = 14; // topSetterY
     let tSH = 20; // topSetterHeight
@@ -153,10 +170,10 @@ function renderTestShapes() {
     canvasMasterContext.lineTo(tSX, tSY+tSH);
     canvasMasterContext.arc(tSX, tSY+tSH/2, tSH/2, Math.PI/2, -Math.PI/2, false);
     canvasMasterContext.stroke();
-    if (usingTopParallelSetter) {
+    if (parallelBarDragging.top) {
       canvasMasterContext.fillStyle = "rgb(44,54,64)";
       canvasMasterContext.beginPath();
-      canvasMasterContext.arc(to.x, tSY+tSH/2, tSH/2, 0, Math.PI*2, false);
+      canvasMasterContext.arc(mouse.lastRightClick.x, tSY+tSH/2, tSH/2, 0, Math.PI*2, false);
       canvasMasterContext.fill();
     }
     // Left Setter
@@ -167,10 +184,10 @@ function renderTestShapes() {
     canvasMasterContext.lineTo(tSY+tSH, tSX);
     canvasMasterContext.arc(tSY+tSH/2, tSX, tSH/2, 0, -Math.PI, true);
     canvasMasterContext.stroke();
-    if (usingLeftParallelSetter) {
+    if (parallelBarDragging.left) {
       canvasMasterContext.fillStyle = "rgb(44,54,64)";
       canvasMasterContext.beginPath();
-      canvasMasterContext.arc(tSY+tSH/2, to.y, tSH/2, 0, Math.PI*2, false);
+      canvasMasterContext.arc(tSY+tSH/2, mouse.lastRightClick.y, tSH/2, 0, Math.PI*2, false);
       canvasMasterContext.fill();
     }
   }
@@ -178,55 +195,7 @@ function renderTestShapes() {
   canvasMasterContext.fillStyle = "rgb(80, 180, 80)";
   canvasMasterContext.font = '16px sans-serif';
 
-  print_data.forEach(data => {
-    if (data instanceof Ray) {
-      data = new Segment(data.origin, new Point(999999 * Math.cos(data.angle), 999999 * Math.sin(data.angle)))
-    } else
-    if (data instanceof Blocker) {
-      data = data.polygon
-    } else
-    if (data instanceof Vector) {
-      data = new Point(data.x(), data.y())
-    }
-
-    if (data instanceof Segment) {
-      canvasMasterContext.beginPath()
-      canvasMasterContext.arc(data.a().x, data.a().y, 4, 0, 2 * Math.PI, false)
-      canvasMasterContext.stroke()
-      canvasMasterContext.beginPath()
-      canvasMasterContext.arc(data.b().x, data.b().y, 4, 0, 2 * Math.PI, false)
-      canvasMasterContext.fill()
-      canvasMasterContext.beginPath()
-      canvasMasterContext.moveTo(data.a().x, data.a().y)
-      canvasMasterContext.lineTo(data.b().x, data.b().y)
-      canvasMasterContext.stroke()
-      canvasMasterContext.fillText(data.a().print(), data.a().x+5, data.a().y - 5)
-      canvasMasterContext.fillText(data.b().print(), data.b().x+5, data.b().y - 5)
-    } else
-    if (data instanceof Point) {
-      canvasMasterContext.beginPath();
-      canvasMasterContext.arc(data.x, data.y, 4, 0, 2 * Math.PI, false);
-      canvasMasterContext.fill();
-      canvasMasterContext.fillText(data.print(), mouse.x + 5, mouse.y - 5);
-      canvasMasterContext.fillText(data.print(), data.x + 5, data.y - 5);
-    } else
-    if (data instanceof Polygon) {
-      data.vertices.forEach((vertex, vIndex) => {
-        let cirleRadius = vIndex == 1 || vIndex == 0 ? 4 : 2
-        canvasMasterContext.beginPath();
-        canvasMasterContext.arc(vertex.x, vertex.y, cirleRadius, 0, 2 * Math.PI, false);
-        if (vIndex == 0) canvasMasterContext.stroke();
-        else canvasMasterContext.fill()
-      })
-      canvasMasterContext.fillStyle = "rgba(80, 180, 80, 0.2)";
-      canvasMasterContext.beginPath();
-      canvasMasterContext.moveTo(data.vertices[0].x, data.vertices[0].y);
-      data.vertices.forEach(vertex => canvasMasterContext.lineTo(vertex.x, vertex.y))
-      canvasMasterContext.lineTo(data.vertices[0].x, data.vertices[0].y);
-      if (!data.counterclockwise) canvasMasterContext.fill()
-      canvasMasterContext.stroke();
-    }
-  })
+  renderLogData(canvasMasterContext)
 }
 contentOut.onmousemove = e => {
   let offsetY = contentOut.offsetTop
@@ -247,31 +216,6 @@ contentOut.onscroll = () => {
     }
   }
 }
-/**
- * Text is required and will be placed into the output list in its own list item.
- * Optional parameter 'data' can be an array with segments, points, vectors, rays, polygons, and blockers.
- * Passing true or false into the optional 'flush' argument will clear all output before printing the text.
- */
-function print(text, data, flush) {
-  if (randomizingPaths || draggingParallelLines) { return; }
-
-  // Optional(overloaded) parameter handling...
-  if (!Array.isArray(data)) {
-    if (typeof data == typeof true) flush = data;
-    data = [];
-  } else flush = flush || false;
-  let li = document.createElement("li");
-
-  li.innerHTML = text;
-  li.onmouseenter = () => print_data = data
-  li.onmouseleave = () => print_data = []
-  if (flush) {
-    contentOut.innerHTML = "";
-    contentOut.appendChild(li);
-  } else {
-    contentOut.appendChild(li);
-  }
-}
 
 // ======================================================================================================================== Clock =====
 window.requestAnimFrame =
@@ -288,9 +232,9 @@ function update(delta) {
   canvasUpdating = true
   if (canvasFlush) canvasMasterContext.clearRect(0, 0, canvas_bg.width, canvas_bg.height)
 
-  Blocker.blockers.forEach(blocker =>  blocker.render(canvasMasterContext))
-  if (editingBlockers) Blocker.constructionRender(canvasMasterContext)
-  if (gridify && !editingBlockers) drawGrid(canvasMasterContext)
+  Layout.renderBlockers(canvasMasterContext)
+  if (editingBlockers) Layout.constructionRender(canvasMasterContext)
+  if (gridify && !editingBlockers) Layout.renderTriangulation(canvasMasterContext)
   if (contentOutScrolling) contentOut.scrollTop += 1
 
   renderTestShapes()
@@ -305,49 +249,50 @@ document.onkeypress = e => {
   e = e || window.event;
   // pressing 'spacebar'
   if (e.keyCode == 32) {
-    // toggleCanvasRunning();
     toggleCanvasRunning();
   }
 }
 
 bgCanvas.onmousedown = e => {
   if (editingBlockers) {
-    if (e.button === 0) {  // Left click add vertex
-      Blocker.constsructingVertices.push(new Point(mouse.x, mouse.y));
+    if (e.button === 0) {  // Left click add vertex unless smooth constructing
+      if (!editingBlockersSmooth) {
+        Layout.addConstructionPoint(mouse.loc);
+      } else {
+        editingBlockersSmoothTracking = true
+      }
     } else { // Right click finish vertex
-      Blocker.finishConstruction();
+      Layout.finishConstruction(mouse.loc);
     }
     return
   }
 
-  if (showingParallelSetters) {
+  if (parallelBarsVisible) {
     if (
-      PARALLEL_SETTER_TOP_X < mouse.x && mouse.x < (canvas_bg.width - PARALLEL_SETTER_TOP_X) &&
-      PARALLEL_SETTER_TOP_Y < mouse.y && mouse.y < (PARALLEL_SETTER_TOP_Y + PARALLEL_SETTER_TOP_H)
+      PARALLEL_SETTER_TOP_X < mouse.loc.x && moumouse.locse.x < (canvas_bg.width - PARALLEL_SETTER_TOP_X) &&
+      PARALLEL_SETTER_TOP_Y < mouse.loc.y && mouse.loc.y < (PARALLEL_SETTER_TOP_Y + PARALLEL_SETTER_TOP_H)
     ) {
-      draggingParallelLines = true;
-      usingTopParallelSetter = true;
-      usingLeftParallelSetter = false;
+      parallelBarDragging.top = true;
+      parallelBarDragging.left = false;
       return;
     } else
     if (
-      PARALLEL_SETTER_TOP_Y < mouse.x && mouse.x < (PARALLEL_SETTER_TOP_Y + PARALLEL_SETTER_TOP_H) &&
-      PARALLEL_SETTER_TOP_X < mouse.y && mouse.y < (canvas_bg.height - PARALLEL_SETTER_TOP_X)
+      PARALLEL_SETTER_TOP_Y < mouse.loc.x && mouse.loc.x < (PARALLEL_SETTER_TOP_Y + PARALLEL_SETTER_TOP_H) &&
+      PARALLEL_SETTER_TOP_X < mouse.loc.y && mouse.loc.y < (canvas_bg.height - PARALLEL_SETTER_TOP_X)
     ) {
-      draggingParallelLines = true;
-      usingLeftParallelSetter = true;
-      usingTopParallelSetter = false;
+      parallelBarDragging.left = true;
+      parallelBarDragging.top = false;
       return;
     } else {
-      usingTopParallelSetter = false;
-      usingLeftParallelSetter = false;
+      parallelBarDragging.top = false;
+      parallelBarDragging.left = false;
     }
   }
 
-  if (e.button === 0) { // Left click origin point
-    origin = new Point(mouse.x, mouse.y)
-  } else { // Right click destination point
-    to = new Point(mouse.x, mouse.y)
+  if (e.button === 0) { // Left click
+    mouse.lastLeftClick = new Point(mouse.loc.x, mouse.loc.y)
+  } else { // Right click
+    mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
   }
 
   if (!editingBlockers && gridify) {
@@ -355,48 +300,45 @@ bgCanvas.onmousedown = e => {
     test_circles = []
     test_points = []
 
-    let polygons = getRoute(origin, to)
-    cache_triangulation.forEach(polygon => {
-      if (polygons.indexOf(polygon) == -1) {
-        polygon.highlighted = false
-      } else {
-        polygon.highlighted = true
-      }
-    })
-    testLine(origin, to)
-    testPoint(origin.x, origin.y)
-    testPoint(to.x, to.y)
+    Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
+
+    testLine(mouse.lastLeftClick, mouse.lastRightClick)
+    testPoint(mouse.lastLeftClick.x, mouse.lastLeftClick.y)
+    testPoint(mouse.lastRightClick.x, mouse.lastRightClick.y)
   }
 }
 
-bgCanvas.onmouseup = e => { draggingParallelLines = false; }
+bgCanvas.onmouseup = e => {
+  parallelBarDragging = {top: false, left: false}
+  if (editingBlockersSmoothTracking && editingBlockers && editingBlockersSmooth) {
+    Layout.finishConstruction(mouse.loc);
+  }
+  editingBlockersSmoothTracking = false
+}
 
 bgCanvas.onmousemove = e => {
   if (canvasRunning) {
     let rect = bgCanvas.getBoundingClientRect();
-    mouse = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top))
+    mouse.loc = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top))
 
-    // Parallel setter dragging
-    if (draggingParallelLines) {
-      if (usingTopParallelSetter) {
-        origin.x = Math.min(Math.max(mouse.x, PARALLEL_SETTER_TOP_X), bgCanvas.width - PARALLEL_SETTER_TOP_X);
-        origin.y = 0;
-        to.x = Math.min(Math.max(mouse.x, PARALLEL_SETTER_TOP_X), bgCanvas.width - PARALLEL_SETTER_TOP_X);
-        to.y = bgCanvas.height;
+    // Parallel bar dragging
+    disableLogging(parallelBarDragging.top || parallelBarDragging.left)
+    if (parallelBarDragging.top || parallelBarDragging.left) {
+      if (parallelBarDragging.top) {
+        mouse.lastLeftClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), bgCanvas.width - PARALLEL_SETTER_TOP_X), 0)
+        mouse.lastRightClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), bgCanvas.width - PARALLEL_SETTER_TOP_X), bgCanvas.height)
       } else
-      if (usingLeftParallelSetter) {
-        origin.x = 0;
-        origin.y = Math.min(Math.max(mouse.y, PARALLEL_SETTER_TOP_X), bgCanvas.height - PARALLEL_SETTER_TOP_X);
-        to.x = bgCanvas.width;
-        to.y = Math.min(Math.max(mouse.y, PARALLEL_SETTER_TOP_X), bgCanvas.height - PARALLEL_SETTER_TOP_X);
+      if (parallelBarDragging.left) {
+        mouse.lastLeftClick = new Point(0, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), bgCanvas.height - PARALLEL_SETTER_TOP_X))
+        mouse.lastRightClick = new Point(bgCanvas.width, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), bgCanvas.height - PARALLEL_SETTER_TOP_X))
       }
     } else if (!editingBlockers) {
       // Drag pathing
       if (e.buttons === 1 || e.buttons == 2) {
         if (e.buttons === 1) {
-          origin = new Point(mouse.x, mouse.y)
+          mouse.lastLeftClick = new Point(mouse.loc.x, mouse.loc.y)
         } else if (e.buttons == 2) {
-          to = new Point(mouse.x, mouse.y)
+          mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
         }
 
         if (!editingBlockers && gridify) {
@@ -404,18 +346,22 @@ bgCanvas.onmousemove = e => {
           test_circles = []
           test_points = []
 
-          let polygons = getRoute(origin, to, false)
-          cache_triangulation.forEach(polygon => {
-            if (polygons.indexOf(polygon) == -1) {
-              polygon.highlighted = false
-            } else {
-              polygon.highlighted = true
-            }
-          })
-          testLine(origin, to)
-          testPoint(origin.x, origin.y)
-          testPoint(to.x, to.y)
+          // let polygons = Layout.route(mouse.lastLeftClick, mouse.lastRightClick, false)
+          // cache_triangulation.forEach(polygon => {
+          //   if (polygons.indexOf(polygon) == -1) {
+          //     polygon.highlighted = false
+          //   } else {
+          //     polygon.highlighted = true
+          //   }
+          // })
+          testLine(mouse.lastLeftClick, mouse.lastRightClick)
+          testPoint(mouse.lastLeftClick.x, mouse.lastLeftClick.y)
+          testPoint(mouse.lastRightClick.x, mouse.lastRightClick.y)
         }
+      }
+    } else if (editingBlockers && editingBlockersSmooth) {
+      if (editingBlockersSmoothTracking) {
+        Layout.addConstructionPoint(new Point(mouse.loc.x, mouse.loc.y));
       }
     }
   }
@@ -423,6 +369,10 @@ bgCanvas.onmousemove = e => {
 }
 
 bgCanvas.oncontextmenu = e => e.preventDefault()
+
+window.onresize = () => {
+  homeRefit();
+}
 
 function homeRefit() {
   canvas_bg.width = canvas_bg.offsetWidth * RENDER_SCALING;
@@ -433,109 +383,109 @@ function homeRefit() {
   canvas_bg.width = RENDER_SCALING * canvas_bg.offsetWidth;
   canvas_bg.height = RENDER_SCALING * canvas_bg.offsetHeight;
 
-  boundsBlocker = new Blocker([
+  Layout.newBlocker([
     new Point(15, 15),
     new Point(15, canvas_bg.height - 15),
     new Point(canvas_bg.width - 15, canvas_bg.height - 15),
     new Point(canvas_bg.width - 15, 15)
-  ])
-  new Blocker([
+  ], IS_BOUNDS_BLOCKER)
+  Layout.newBlocker([
     new Point(200, 200),
     new Point(300, 200),
     new Point(300, 300),
     new Point(200, 300)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(220, 160),
     new Point(230, 160),
     new Point(230, 210),
     new Point(220, 210)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(280, 160),
     new Point(290, 160),
     new Point(290, 210),
     new Point(280, 210)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(220, 160),
     new Point(290, 160),
     new Point(290, 170),
     new Point(220, 170)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(400, 270),
     new Point(450, 290),
     new Point(430, 310),
     new Point(390, 290)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(300, 480),
     new Point(480, 499),
     new Point(370, 600),
     new Point(280, 560)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(350, 358),
     new Point(440, 390),
     new Point(430, 420),
     new Point(340, 370)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(480, 400),
     new Point(500, 390),
     new Point(510, 450),
     new Point(470, 445)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(480, 300),
     new Point(500, 290),
     new Point(510, 350),
     new Point(470, 345)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(480, 200),
     new Point(500, 190),
     new Point(510, 250),
     new Point(470, 245)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(600, 200),
     new Point(700, 200),
     new Point(700, 300),
     new Point(600, 300)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(675, 175),
     new Point(775, 175),
     new Point(775, 300),
     new Point(675, 275)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(650, 250),
     new Point(750, 250),
     new Point(750, 350),
     new Point(650, 350)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(600, 470),
     new Point(650, 490),
     new Point(630, 510),
     new Point(590, 490)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(600, 480),
     new Point(725, 500),
     new Point(705, 520),
     new Point(665, 500)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(500, 600),
     new Point(800, 600),
     new Point(810, 620),
     new Point(490, 620)
   ])
-  new Blocker([
+  Layout.newBlocker([
     new Point(60, 800),
     new Point(100, 823),
     new Point(96, 884),

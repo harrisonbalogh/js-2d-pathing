@@ -37,8 +37,10 @@
         <li id="setting-item-randomizerToggle">Randomizer</li>
         <li id="setting-item-parallelLinesToggle">Parallel Lines</li>
         <li id="setting-item-editMode">Edit Mode</li>
+        <li class="setting-sub hidden" id="setting-item-editMode-smooth">Smooth</li>
         <li id="setting-item-gridified">Gridified</li>
-        <li id="setting-item-optimize">Optimize Grid</li>
+        <li class="setting-sub hidden" id="setting-item-gridified-optimize">Optimize</li>
+        <li id="setting-item-defaultLayout">Default Layout</li>
       </ul>
       <ul class="content-output" id="content-output">
       </ul>
@@ -54,14 +56,6 @@
   </footer>
 
   <!-- ==================== SCRIPTS ==================== -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.0/plugins/CSSPlugin.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.0/easing/EasePack.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.0/TweenLite.min.js"></script>
-  <script src="javascript/home_canvasObjects/error.js"></script>
-  <script src="javascript/base.js"></script>
-  <script src="javascript/home_canvasObjects/geometry.js"></script>
-  <script src="javascript/home_canvasObjects/blocker.js"></script>
-  <script src="javascript/home_canvasObjects/gridify.js"></script>
-  <script src="javascript/home.js"></script>
+  <script type='module' src='javascript/core.js'></script>
 </body>
 </html>

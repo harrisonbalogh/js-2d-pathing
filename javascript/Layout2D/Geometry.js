@@ -1,5 +1,8 @@
+// Use the following:
+// import { Segment, Line, Ray, Vector, Polygon, Point } from './Layout2D/Geometry.js'
+
 /// A segment is composed of 2 vertices.
-class Segment {
+export class Segment {
   constructor(vertex1, vertex2) {
     if (vertex1 == undefined || vertex2 == undefined) {
       throw "Passed in undefined segment vertex?"
@@ -100,8 +103,8 @@ class Segment {
     return (this._a.equals(segment._a) && this._b.equals(segment._b));
   }
 
-  print() {
-    return this._a.print() + " -> " + this._b.print();
+  logString() {
+    return this._a.logString() + " -> " + this._b.logString();
   }
 
   distanceSqrd() {
@@ -141,7 +144,7 @@ class Segment {
 /// Unlike a segment, a line does not end at its a and b points - it passes through them.
 /// This is primarily used for line intersection checks (versus bounded segment checks).
 /// Create a line from a segment using the line() function on a segment object.
-class Line {
+export class Line {
   constructor(point1, point2) {
     this.a = point1;
     this.b = point2;
@@ -190,7 +193,7 @@ class Line {
  * @param Number direction The angle, in degrees, in which the ray extends. This value can
  * also be passed in as a Vector which will use the vector's angle as the direction.
  */
-class Ray {
+export class Ray {
   constructor(origin, direction) {
     if (origin.constructor.name == "Point") {
       this.origin = origin
@@ -208,14 +211,14 @@ class Ray {
     }
   }
 
-  print() {
-    return `From ${this.origin.print()} towards ${this.angle}`
+  logString() {
+    return `From ${this.origin.logString()} towards ${this.angle}`
   }
 }
 
 /// A vector is a point with a direction. This vector is a segment where vertex1
 /// is (0,0) and vertex2 is (x,y). Components/magnitude/angle properties are cached.
-class Vector {
+export class Vector {
   constructor(x, y) {
     this._x = x
     this._y = y
@@ -232,7 +235,7 @@ class Vector {
       this._x = val
     }
     if (this._x === undefined) this._x = this.magnitude() * Math.cos(this.angle())
-    if (Number.isNaN(this._x)) throw `x component is NaN for V:${this.print()}`
+    if (Number.isNaN(this._x)) throw `x component is NaN for V:${this.logString()}`
     return this._x
   }
   /// Getter if 'val' is not provided, setter if 'val' is provided
@@ -244,7 +247,7 @@ class Vector {
       this._y = val
     }
     if (this._y === undefined) this._y = this.magnitude() * Math.sin(this.angle())
-    if (Number.isNaN(this._y)) throw `x component is NaN for V:${this.print()}`
+    if (Number.isNaN(this._y)) throw `x component is NaN for V:${this.logString()}`
     return this._y
   }
   /// Getter if 'val' is not provided, setter if 'val' is provided
@@ -262,11 +265,11 @@ class Vector {
       this._magnitude = val
     }
     if (this._magnitude === undefined) {
-      if (this._x === undefined) throw `x component and magnitude are undefined for V:${this.print()}`
-      if (this._y === undefined) throw `y component and magnitude are undefined for V:${this.print()}`
+      if (this._x === undefined) throw `x component and magnitude are undefined for V:${this.logString()}`
+      if (this._y === undefined) throw `y component and magnitude are undefined for V:${this.logString()}`
       this._magnitude = Math.sqrt(Math.pow(this.x(), 2) + Math.pow(this.y(), 2))
     }
-    if (Number.isNaN(this._magnitude)) throw `magnitude is NaN for V:${this.print()}`
+    if (Number.isNaN(this._magnitude)) throw `magnitude is NaN for V:${this.logString()}`
     return this._magnitude
   }
   /// Getter if 'val' is not provided, setter if 'val' is provided
@@ -284,7 +287,7 @@ class Vector {
         this._angle = Math.atan2(this.y(), this.x())
       }
     }
-    if (Number.isNaN(this._angle)) throw `angle is NaN for V:${this.print()}`
+    if (Number.isNaN(this._angle)) throw `angle is NaN for V:${this.logString()}`
     return this._angle
   }
 
@@ -329,7 +332,7 @@ class Vector {
     if (this._magnitude !== undefined) return this._magnitude * this._magnitude
     return this.x() * this.x() + this.y() * this.y()
   }
-  print() {
+  logString() {
     return `(${this._x}, ${this._y}) D:${this._magnitude} A:${(this._angle === undefined) ? undefined : this._angle / Math.PI * 180}`
   }
   // Return quadrant 1, 2, 3, or 4
@@ -391,7 +394,7 @@ class Vector {
   }
 }
 
-class Polygon {
+export class Polygon {
   constructor(vertices, holes) {
     this.vertices = [...vertices]
 
@@ -415,8 +418,7 @@ class Polygon {
       let vNext = vertices[(i + 1) % vertices.length]
       averageSlope += (vNext.x - v.x) * (vNext.y + v.y)
     }
-    if (averageSlope > 0) this.counterclockwise = true
-    else this.counterclockwise = false
+    this.counterclockwise = (averageSlope > 0)
 
     // Reference to hole polygons relative to this polygon
     this.holes = (holes === undefined) ? [] : holes
@@ -697,7 +699,7 @@ class Polygon {
   }
 }
 
-class Point {
+export class Point {
   constructor(x, y) {
     this.x = x;
     this.y = y;
@@ -731,7 +733,7 @@ class Point {
     this.cross = function(point) {
       return this.x * point.y - this.y * point.x;
     }
-    this.print = () => {
+    this.logString = () => {
       return "("+parseInt(this.x)+","+parseInt(this.y)+")";
     }
   }
@@ -748,20 +750,17 @@ var ORIENTATION = {
  *
  * @returns  0 - collinear, 1 - cw, 2 - ccw
  */
-function orientation(p1, p2, p3) {
+export function orientation(p1, p2, p3) {
   let val = (p2.y - p1.y) * (p3.x - p2.x) -
             (p2.x - p1.x) * (p3.y - p2.y);
   if (val == 0) return ORIENTATION.COLLINEAR;
   return (val > 0) ? ORIENTATION.CW : ORIENTATION.CCW
 }
-function collinear(p1, p2, p3) {
-  return (orientation(p1, p2, p3) == 0)
-}
 
 /**
  * Extrude polygon vertices. An approximation of padding or "stroking" a polygon.
  */
-function extrudeVertices(vertices, extrude) {
+export function extrudeVertices(vertices, extrude) {
   // return vertices;
   let extrudedVertices = [];
   for (let v = 0; v < vertices.length; v++) {
@@ -787,7 +786,7 @@ function extrudeVertices(vertices, extrude) {
   return extrudedVertices;
 }
 
-function closestPointAroundVertices(vertices, start, vGoal, destination) {
+export function closestPointAroundVertices(vertices, start, vGoal, destination) {
   // ===== Shortest route around visible vertices
   let farthestVertexAbove = {
     vertex: undefined,
@@ -835,7 +834,7 @@ function closestPointAroundVertices(vertices, start, vGoal, destination) {
   return towards.vertex;
 }
 
-function boundAngle(angle) {
+export function boundAngle(angle) {
   let newAngle = angle;
   while (newAngle < 0) {
     newAngle += 2 * Math.PI;

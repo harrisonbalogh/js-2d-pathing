@@ -1,16 +1,8 @@
-
-var cache_triangulation = []
+import { Segment, Vector, Polygon, Point } from './Geometry.js'
 
 let TRIANGULATION_ANGLE_BOUND = (20) / 180 * Math.PI
 
-function generateGrid() {
-  cache_triangulation = []
-  let holePolygons = []
-  Blocker.blockers.forEach(holeBlocker => {
-    if (holeBlocker == boundsBlocker) return
-    holePolygons.push(holeBlocker.polygon)
-  })
-
+export default function generateTriangulation(boundsBlocker, holePolygons, optimize = false) {
   let vertices = boundsBlocker.vertices().map(vertex => new Point(vertex.x, vertex.y))
 
   // Connect holes to bounds blocker using bridge segments to form one degenerate polygon
@@ -84,14 +76,14 @@ function generateGrid() {
       }
     }
     if (lowest.i === undefined) {
-      console.log("No eartips?")
+      console.logString("No eartips?")
       break
     }
     let vPrev = vertices[(lowest.i - 1) < 0 ? vertices.length - 1 : (lowest.i - 1)]
     let v = vertices[lowest.i]
     let vNext = vertices[(lowest.i + 1) % vertices.length]
     if (vPrev === undefined || v === undefined || vNext === undefined) {
-      console.log(`Vertex count: ${vertices.length} - ${lowest.i}`)
+      console.logString(`Vertex count: ${vertices.length} - ${lowest.i}`)
       throw 'Help'
     }
     let triangle = new Polygon([vNext, v, vPrev])
@@ -111,7 +103,7 @@ function generateGrid() {
       {angle: getVectorAngle(new Vector(v.x - vNext.x, v.y - vNext.y), new Vector(vPrev.x - vNext.x, vPrev.y - vNext.y)), oppositeEdge: edge2} // vNext
     ]
 
-    if (optimizeGridify && (optimizeVertices[0].angle < TRIANGULATION_ANGLE_BOUND || optimizeVertices[1].angle < TRIANGULATION_ANGLE_BOUND || optimizeVertices[2].angle < TRIANGULATION_ANGLE_BOUND)) {
+    if (optimize && (optimizeVertices[0].angle < TRIANGULATION_ANGLE_BOUND || optimizeVertices[1].angle < TRIANGULATION_ANGLE_BOUND || optimizeVertices[2].angle < TRIANGULATION_ANGLE_BOUND)) {
       // Optimize triangle
       let optimizeVertex = optimizeVertices[0]
       let smallestAngle = optimizeVertices[0].angle
@@ -169,10 +161,9 @@ function generateGrid() {
     setEartipStatus(vertices, vertices.indexOf(vNext))
   }
 
-  cache_triangulation = triangles
-  setNeighbors()
+  setNeighbors(triangles)
+  return triangles
 }
-
 function setConvexAndAngleFor(vertices, i) {
   let vPrev = vertices[(i - 1) < 0 ? vertices.length - 1 : (i - 1)]
   let v = vertices[i]
@@ -197,7 +188,7 @@ function setEartipStatus(vertices, i) {
   let vNext = vertices[(i + 1) % vertices.length]
 
   if (!v.convex) {
-    // print(`    Eartip is not convex skipping.`, [new Segment(v, vPrev), new Segment(v, vNext)])
+    // log(`    Eartip is not convex skipping.`, [new Segment(v, vPrev), new Segment(v, vNext)])
     vertices[i].eartip = false
     return
   }
@@ -206,21 +197,20 @@ function setEartipStatus(vertices, i) {
   for (let d = 0; d < vertices.length; d++) {
     if (vertices[d].convex) continue
     if (triangle.containsPoint(vertices[d])) {
-      // print(`    Eartip contains point ${vertices[d].print()}.`, [vertices[d],  new Segment(v, vPrev), new Segment(v, vNext)])
+      // log(`    Eartip contains point ${vertices[d].logString()}.`, [vertices[d],  new Segment(v, vPrev), new Segment(v, vNext)])
       vertices[i].eartip = false
       return
     }
   }
-  // print(`    Eartip with angle ${v.angle * 180 / Math.PI}.`, [new Segment(v, vPrev), new Segment(v, vNext)])
+  // log(`    Eartip with angle ${v.angle * 180 / Math.PI}.`, [new Segment(v, vPrev), new Segment(v, vNext)])
   v.eartip = true
 }
-
-function setNeighbors() {
-  for (let i = 0; i < cache_triangulation.length; i++) {
-    let polygon = cache_triangulation[i]
-    for (let p = 0; p < cache_triangulation.length; p++) {
+function setNeighbors(triangles) {
+  for (let i = 0; i < triangles.length; i++) {
+    let polygon = triangles[i]
+    for (let p = 0; p < triangles.length; p++) {
       if (i == p) continue
-      let peerPolygon = cache_triangulation[p]
+      let peerPolygon = triangles[p]
       polygon.edges.forEach(edge => {
         if (edge.peer !== undefined) return
         peerPolygon.edges.forEach(peerEdge => {
@@ -237,7 +227,6 @@ function setNeighbors() {
     }
   }
 }
-
 function getPeerEdge(peers, edge) {
   if (edge.peer !== undefined) return edge.peer
   for (let p = 0; p < peers.length; p++) {
@@ -249,126 +238,6 @@ function getPeerEdge(peers, edge) {
   }
   return undefined
 }
-
 function getVectorAngle(prevVector, nextVector) {
   return Math.acos(prevVector.dotProduct(nextVector) / (prevVector.magnitude() * nextVector.magnitude()))
-}
-
-/// DEPRECATED: routeHeuristic(nodes[iDestination], next)
-function routeHeuristic(a, b) {
-  let x1 = a.polygon.circumcenter.x
-  let y1 = a.polygon.circumcenter.y
-  let x2 = b.polygon.circumcenter.x
-  let y2 = b.polygon.circumcenter.y
-  return Math.abs(x1 - x2) + Math.abs(y1 - y2)
-}
-
-function priorityNode(node, priority) {
-  if (priority === undefined)
-    throw "Pathfinding error. Failed to calculate priority."
-  node.priority = priority
-  return node
-}
-
-function popPriorityNode(nodes) {
-  let lowest = {priority: undefined, node: undefined}
-  nodes.forEach(node => { // retrieve highest priority (lowest value) node
-    if (node.priority === undefined) throw "Bad pathfinding logic. Node should have priority set."
-    if (lowest.priority === undefined || node.priority < lowest.priority) lowest = {priority: node.priority, node: node}
-  })
-  let node = nodes.splice(nodes.indexOf(lowest.node), 1)[0] // pop from queue
-  node.priority = undefined
-  return node
-}
-
-function pushPriorityNode(pathfinder, node) {
-  if (pathfinder.indexOf(node) != -1) return
-  pathfinder.push(node)
-}
-
-/** A* pathfinding */
-function getRoute(origin, destination, logged = true) {
-  if (logged) print(`Routing ${origin.print()} to ${destination.print()}`, [origin, destination], true)
-  let iOrigin = undefined
-  let iDestination = undefined
-
-  // move origin and destination outside of any blockers
-  Blocker.blockers.forEach(blocker => {
-    origin = blocker.polygon.closestPointOutsideFrom(origin)
-    destination = blocker.polygon.closestPointOutsideFrom(destination)
-  })
-  // testCircle(destination.x, destination.y, 7)
-
-  // find origin and destination polygons
-  for (let i = 0; i < cache_triangulation.length; i++) {
-    let polygon = cache_triangulation[i]
-    if (iOrigin === undefined && polygon.containsPoint(origin)) iOrigin = i
-    if (iDestination === undefined && polygon.containsPoint(destination)) iDestination = i
-    if (iOrigin !== undefined && iDestination !== undefined) break
-  }
-  if (iOrigin === undefined || iDestination === undefined) return []
-
-  let nodes = cache_triangulation.map(polygon => {
-    return {frontier: undefined, from: undefined, cost: undefined, polygon: polygon, priority: undefined}
-  })
-
-  nodes[iOrigin].cost = 0
-  nodes[iOrigin].frontier = origin
-  let pathfinder = [priorityNode(nodes[iOrigin], 0)]
-
-  while (pathfinder.length != 0) {
-    let current = popPriorityNode(pathfinder)
-
-    if (current === nodes[iDestination]) break
-
-    current.polygon.edges.forEach(edge => {
-      if (edge.peer === undefined) return
-      let next = nodes[cache_triangulation.indexOf(edge.peer.parent)]
-      let frontier = edge.closestPointOnSegmentTo(current.frontier)
-      let cost = current.cost + Segment.distance(current.frontier, frontier) // TODO: edge cost is always 0
-      if (logged) {
-        testLine(current.frontier, frontier)
-        print(`        Frontier ${frontier.print()} costs ${cost}`, [current.frontier, frontier, edge])
-      }
-
-      if (next.cost === undefined || cost < next.cost) {
-        next.cost = cost
-        next.frontier = frontier
-        next.from = current
-        let priority = cost + Segment.distance(frontier, destination) // route heuristic
-        if (priority === undefined) throw "Pathfinding error. Failed to calculate priority."
-        pushPriorityNode(pathfinder, priorityNode(next, priority))
-      }
-    })
-  }
-
-  let current = nodes[iDestination]
-  let route = [current.polygon]
-  while (current.from !== undefined) {
-    current = current.from
-    route.push(current.polygon)
-  }
-  if (logged) print(`Route from ${origin.print()} to ${destination.print()}`, route)
-  return route
-}
-
-function drawGrid(context) {
-  cache_triangulation.forEach(polygon => {
-    context.strokeStyle = "rgba(50, 50, 200, 0.3)"
-    context.fillStyle = "rgba(50, 50, 200, 0.05)"
-    if (polygon.highlighted !== undefined && polygon.highlighted) {
-      context.fillStyle = "rgba(50, 50, 200, 0.3)"
-    }
-    polygon.vertices.forEach(vertex => {
-      context.beginPath();
-      context.arc(vertex.x, vertex.y, 2, 0, 2 * Math.PI, false);
-      context.fill()
-    })
-    context.beginPath();
-    context.moveTo(polygon.vertices[0].x, polygon.vertices[0].y);
-    polygon.vertices.forEach(vertex => context.lineTo(vertex.x, vertex.y))
-    context.lineTo(polygon.vertices[0].x, polygon.vertices[0].y);
-    if (!polygon.counterclockwise) context.fill()
-    context.stroke();
-  });
 }

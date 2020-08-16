@@ -25,6 +25,8 @@ canvas {
   border-bottom: 1px solid black;
   cursor: default;
   list-style: none;
+  height: 30%;
+  overflow-y: auto;
   margin: 0;
   padding: 0;
   width: 100%;
@@ -42,7 +44,7 @@ canvas {
   cursor: pointer;
   font-size: 12px;
   line-height: 26px;
-  margin: 1px 6px 8px 6px;
+  margin: 9px 6px 0 6px;
   padding: 0 0 0 22px;
 }
 .controls-settings li:hover {
@@ -53,22 +55,38 @@ canvas {
   background-color: lightgray;
 }
 
+.controls-settings li:nth-last-child(1) {
+  margin-bottom: 8px;
+}
+
+.controls-settings li.setting-sub {
+  border-radius: 0 0 12px 12px;
+  background-color: rgb(220, 220, 220);
+  margin: 0 16px 8px 16px;
+}
+
+.controls-settings li.setting-sub.hidden {
+  display: none;
+}
+
 /* - - - - - - - - OUT - - - - - - - - */
 
 .content-output {
   font-size: 10px;
-  display: inline;
+  height: 70%;
   list-style: none;
   margin: 0;
-  overflow: auto;
+  overflow: hidden auto;
   padding: 0;
+  width: 100%;
 }
 
 .content-output li {
   border-bottom: 1px solid lightgrey;
-  opacity: 0.75;
-  padding: 6px 0 6px 2px;
-  white-space: pre;
+  line-height: 16px;
+  /* opacity: 0.75; */
+  padding: 2px 0 2px 2px;
+  white-space: pre-wrap;
 }
 .content-output li:hover {
   background-color: lightgrey;
