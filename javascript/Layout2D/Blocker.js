@@ -40,4 +40,16 @@ export default class Blocker {
       context.stroke();
     });
   }
+
+  serialized() {
+    let serializedBlockers = []
+    this.originalVertices.forEach(vertices => {
+      let serializedVertices = []
+      vertices.forEach(p => {
+        serializedVertices.push([p.x, p.y])
+      })
+      serializedBlockers.push(serializedVertices)
+    })
+    return serializedBlockers
+  }
 }

@@ -2,6 +2,7 @@ import './Layout2D/Error.js'
 import { Point } from './Layout2D/Geometry.js'
 import * as Layout from './Layout2D/Layout.js'
 import { renderLogData, disableLogging, setup as logSetup } from './log.js'
+import log from './log.js'
 
 // Classes in JavaScript are not hoisted! Variables/functions are lifted to the top of their scope for order-less reference
 // ==================================================================================================================== Variables =====
@@ -14,7 +15,6 @@ let canvas_bg = document.getElementById("bgCanvas")
 let canvasMasterContext = canvas_bg.getContext('2d') // The primary canvas particles are drawn on
 let parallelBarsVisible = false;
 let parallelBarDragging = {top: false, left: false}
-let IS_BOUNDS_BLOCKER = true
 let mouse = {
   loc: new Point(0, 0),
   lastLeftClick: new Point(0, 0),
@@ -39,6 +39,8 @@ document.getElementById('setting-item-editMode').onclick = function(){settingTog
 document.getElementById('setting-item-editMode-smooth').onclick = function(){settingToggle(this, toggleEditModeSmooth)}
 document.getElementById('setting-item-gridified').onclick = function(){settingToggle(this, toggleGridified)}
 document.getElementById('setting-item-gridified-optimize').onclick = function(){settingToggle(this, toggleOptimizeGrid)}
+document.getElementById('setting-item-defaultLayout').onclick = function(){settingToggle(this, resetLayout)}
+document.getElementById('setting-item-printLayout').onclick = function(){settingToggle(this, printLayout)}
 
 function settingToggle(elem, logic) {
   elem.className = elem.className == "active" ? "" : "active"
@@ -68,6 +70,7 @@ function toggleEditMode() {
   editingBlockers = !editingBlockers
   if (!editingBlockers) {
     Layout.clearConstruction()
+    Layout.saveToCookies()
   }
   let smoothClass = 'setting-sub' + (editingBlockersSmooth ? ' active' : '') + (editingBlockers ? '' : ' hidden')
   document.getElementById('setting-item-editMode-smooth').className = smoothClass
@@ -88,6 +91,14 @@ function toggleOptimizeGrid() {
 
   let optimizeClass = 'setting-sub' + (Layout.optimizeTriangulation ? ' active' : '') + (gridify ? '' : ' hidden')
   document.getElementById('setting-item-gridified-optimize').className = optimizeClass
+}
+function resetLayout() {
+  Layout.reset()
+  document.getElementById('setting-item-defaultLayout').className = ''
+}
+function printLayout() {
+  log(Layout.serialized())
+  document.getElementById('setting-item-printLayout').className = ''
 }
 
 // =================================================================================================================== Test stuff =====
@@ -383,114 +394,7 @@ function homeRefit() {
   canvas_bg.width = RENDER_SCALING * canvas_bg.offsetWidth;
   canvas_bg.height = RENDER_SCALING * canvas_bg.offsetHeight;
 
-  Layout.newBlocker([
-    new Point(15, 15),
-    new Point(15, canvas_bg.height - 15),
-    new Point(canvas_bg.width - 15, canvas_bg.height - 15),
-    new Point(canvas_bg.width - 15, 15)
-  ], IS_BOUNDS_BLOCKER)
-  Layout.newBlocker([
-    new Point(200, 200),
-    new Point(300, 200),
-    new Point(300, 300),
-    new Point(200, 300)
-  ])
-  Layout.newBlocker([
-    new Point(220, 160),
-    new Point(230, 160),
-    new Point(230, 210),
-    new Point(220, 210)
-  ])
-  Layout.newBlocker([
-    new Point(280, 160),
-    new Point(290, 160),
-    new Point(290, 210),
-    new Point(280, 210)
-  ])
-  Layout.newBlocker([
-    new Point(220, 160),
-    new Point(290, 160),
-    new Point(290, 170),
-    new Point(220, 170)
-  ])
-  Layout.newBlocker([
-    new Point(400, 270),
-    new Point(450, 290),
-    new Point(430, 310),
-    new Point(390, 290)
-  ])
-  Layout.newBlocker([
-    new Point(300, 480),
-    new Point(480, 499),
-    new Point(370, 600),
-    new Point(280, 560)
-  ])
-  Layout.newBlocker([
-    new Point(350, 358),
-    new Point(440, 390),
-    new Point(430, 420),
-    new Point(340, 370)
-  ])
-  Layout.newBlocker([
-    new Point(480, 400),
-    new Point(500, 390),
-    new Point(510, 450),
-    new Point(470, 445)
-  ])
-  Layout.newBlocker([
-    new Point(480, 300),
-    new Point(500, 290),
-    new Point(510, 350),
-    new Point(470, 345)
-  ])
-  Layout.newBlocker([
-    new Point(480, 200),
-    new Point(500, 190),
-    new Point(510, 250),
-    new Point(470, 245)
-  ])
-  Layout.newBlocker([
-    new Point(600, 200),
-    new Point(700, 200),
-    new Point(700, 300),
-    new Point(600, 300)
-  ])
-  Layout.newBlocker([
-    new Point(675, 175),
-    new Point(775, 175),
-    new Point(775, 300),
-    new Point(675, 275)
-  ])
-  Layout.newBlocker([
-    new Point(650, 250),
-    new Point(750, 250),
-    new Point(750, 350),
-    new Point(650, 350)
-  ])
-  Layout.newBlocker([
-    new Point(600, 470),
-    new Point(650, 490),
-    new Point(630, 510),
-    new Point(590, 490)
-  ])
-  Layout.newBlocker([
-    new Point(600, 480),
-    new Point(725, 500),
-    new Point(705, 520),
-    new Point(665, 500)
-  ])
-  Layout.newBlocker([
-    new Point(500, 600),
-    new Point(800, 600),
-    new Point(810, 620),
-    new Point(490, 620)
-  ])
-  Layout.newBlocker([
-    new Point(60, 800),
-    new Point(100, 823),
-    new Point(96, 884),
-    new Point(58, 886)
-  ])
+  Layout.load()
 }
 
 update()

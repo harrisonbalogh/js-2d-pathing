@@ -8,6 +8,7 @@ let constsructingVertices = []; // Used by editMode
 let needsTriangulation = true
 let triangulationTriangles = undefined
 let boundsBlocker = undefined
+let IS_BOUNDS_BLOCKER = true
 
 export let optimizeTriangulation = false
 export function triangulationOptimized(val) {
@@ -43,8 +44,7 @@ export function newBlocker(vertices, isBoundsBlocker = false) {
 
   needsTriangulation = true
   blockers.push(new Blocker(newPolygon, originalVertices));
-  if (isBoundsBlocker) {
-    boundsBlocker = blockers[blockers.length - 1]}
+  if (isBoundsBlocker) boundsBlocker = blockers[blockers.length - 1]
 }
 /** Returns removal count */
 function deleteBlocker(blockerIndex) {
@@ -221,4 +221,78 @@ export function renderTriangulation(context) {
     if (!polygon.counterclockwise) context.fill()
     context.stroke();
   });
+}
+
+export function saveToCookies() {
+  setCookie('layoutData', serialized(), 365)
+}
+
+export function serialized() {
+  let serializedBlockers = []
+  blockers.forEach(blocker => {
+    serializedBlockers = serializedBlockers.concat(blocker.serialized())
+  })
+  return JSON.stringify(serializedBlockers)
+}
+
+export function reset() {
+  blockers = []
+  needsTriangulation = true
+  setCookie('layoutData', '', 0)
+  loadFromServer()
+}
+
+export function load() {
+  if (!loadFromCookies()) {
+    loadFromServer()
+  }
+}
+
+/// Load cookie cached layout
+function loadFromCookies() {
+  let cookieData = getCookie('layoutData')
+  if (cookieData !== '') {
+    let blockers = JSON.parse(cookieData)
+    blockers.forEach(b => newBlocker(b.map(v => new Point(v[0], v[1])), (boundsBlocker === undefined)))
+    return true
+  }
+  return false
+}
+
+/// Load default server layout JSON
+function loadFromServer() {
+  let xmlhttp = new XMLHttpRequest();
+  xmlhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      let blockers = JSON.parse(this.responseText)
+      blockers.forEach(b => newBlocker(b.map(p => new Point(p[0], p[1])), (boundsBlocker === undefined)))
+
+      saveToCookies()
+    }
+  };
+  xmlhttp.open("GET", "/javascript/Layout2D/layout_default.json", true);
+  xmlhttp.send();
+}
+
+function setCookie(cname, cvalue, exdays) {
+  var d = new Date();
+  d.setTime(d.getTime() + (exdays*24*60*60*1000));
+  var expires = "expires="+ d.toUTCString();
+  document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+}
+
+function getCookie(cname) {
+  var name = cname + "=";
+  var decodedCookie = decodeURIComponent(document.cookie);
+  var ca = decodedCookie.split(';');
+  for(var i = 0; i <ca.length; i++) {
+    var c = ca[i];
+    while (c.charAt(0) == ' ') {
+      c = c.substring(1);
+    }
+    if (c.indexOf(name) == 0) {
+      return c.substring(name.length, c.length);
+    }
+  }
+  return "";
 }
