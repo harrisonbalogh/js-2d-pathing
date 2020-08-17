@@ -241,6 +241,7 @@ export function serialized() {
 export function reset() {
   blockers = []
   needsTriangulation = true
+  boundsBlocker = undefined
   setCookie('layoutData', '', 0)
   loadFromServer()
 }
