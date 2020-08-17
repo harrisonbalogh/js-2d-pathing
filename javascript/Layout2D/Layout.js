@@ -118,6 +118,9 @@ export function constructionRender(context) {
     context.beginPath();
     context.arc(vertex.x, vertex.y, 3, 0, 2 * Math.PI, false);
     context.stroke();
+    context.fillStyle = "Red"
+    context.font = '14px sans-serif';
+    context.fillText(vertex.logString(), vertex.x+5, vertex.y-5);
 
     if (c > 0) {
       let vertexPrev = constsructingVertices[c-1];
