@@ -2,6 +2,7 @@ import { Segment, Line, Ray, Vector, Polygon, Point } from './Layout2D/Geometry.
 import Blocker from './Layout2D/Blocker.js'
 
 let logData = []
+let logSelected = undefined
 let loggingDisabled = false
 export function disableLogging(val) {
   loggingDisabled = val
@@ -29,8 +30,20 @@ export default function log(text, data, flush) {
   let li = document.createElement("li");
 
   li.innerHTML = text;
-  li.onmouseenter = () => logData = data
-  li.onmouseleave = () => logData = []
+  li.onmouseenter = () => {
+    if (logSelected === undefined) logData = data
+  }
+  li.onmousedown = () => {
+    if (logSelected !== undefined) logSelected.style.backgroundColor = ""
+    if (li === logSelected) logSelected = undefined
+    else {
+      logSelected = li
+      logSelected.style.backgroundColor = "darkgray"
+    }
+  }
+  li.onmouseleave = () => {
+    if (logSelected === undefined) logData = []
+  }
   if (flush) {
     contentOut.innerHTML = "";
     contentOut.appendChild(li);

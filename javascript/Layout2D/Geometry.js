@@ -1,5 +1,6 @@
 // Use the following:
 // import { Segment, Line, Ray, Vector, Polygon, Point } from './Layout2D/Geometry.js'
+import log from '../log.js'
 
 /// A segment is composed of 2 vertices.
 export class Segment {
@@ -424,27 +425,15 @@ export class Polygon {
     this.holes = (holes === undefined) ? [] : holes
   }
 
-  generateEdges() {
-    for (let i = 0; i < this.vertices.length; i++) {
-      let vPrev = this.vertices[(i - 1) < 0 ? this.vertices.length - 1 : (i - 1)]
-      let v = this.vertices[i]
-      let vNext = this.vertices[(i + 1) % this.vertices.length]
-
-      let edge0 = new Segment(v, vNext)
-      edge0.parent = triangle
-      let edge1 = new Segment(vNext, vPrev)
-      edge1.parent = triangle
-      let edge2 = new Segment(vPrev, v)
-      edge2.parent = triangle
-
-      triangle.edges = [edge0, edge1, edge2]
-    }
-  }
-
   edges() {
+    if (this._edges !== undefined) return this._edges
     let edges = []
-    this.vertices.forEach((vertex, v) => edges.push(new Segment(vertex, this.vertices[(v + 1) % this.vertices.length])))
-    return edges
+    this.vertices.forEach((vertex, v) => {
+      edges.push(new Segment(vertex, this.vertices[(v + 1) % this.vertices.length]))
+    })
+    edges.forEach(edge => edge.parent = this)
+    this._edges = edges
+    return this._edges
   }
 
   containsPoint(p) {
@@ -696,6 +685,27 @@ export class Polygon {
     });
     // Extend out result by 1 unit to avoid rounding errors
     return closest.point // new Segment(point, closest.point).vector().extendBy(1).asPoint().add(point)
+  }
+
+  interiorAngleVertex(vertex) {
+    let v = (typeof vertex === 'number') ? vertex : this.vertices.indexOf(vertex)
+    vertex = this.vertices[v]
+    let vPrev = this.vertices[(v - 1) < 0 ? this.vertices.length - 1 : (v - 1)]
+    let vNext = this.vertices[(v + 1) % this.vertices.length]
+    let toPrev = new Vector(vPrev.x - vertex.x, vPrev.y - vertex.y)
+    let toNext = new Vector(vNext.x - vertex.x, vNext.y - vertex.y)
+    let r = Math.acos(toPrev.dotProduct(toNext) / (toPrev.magnitude() * toNext.magnitude()))
+    return this.counterclockwise ? 2 * Math.PI - r : r
+  }
+
+  logString() {
+    let logStringBuilder = ''
+    for (let v = 0; v < this.vertices.length; v++) {
+      let vertex = this.vertices[v]
+      logStringBuilder += ` ${vertex.logString()}`
+    }
+    // this.vertices.forEach(vertex => logStringBuilder += ` ${vertex.logString()}`)
+    return logStringBuilder
   }
 }
 

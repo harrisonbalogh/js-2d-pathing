@@ -1,8 +1,10 @@
 import { Segment, Vector, Polygon, Point } from './Geometry.js'
+import log from '../log.js'
 
 let TRIANGULATION_ANGLE_BOUND = (20) / 180 * Math.PI
 
 export default function generateTriangulation(boundsBlocker, holePolygons, optimize = false) {
+  log('Generating triangulation.', [], true)
   let vertices = boundsBlocker.vertices().map(vertex => new Point(vertex.x, vertex.y))
 
   // Connect holes to bounds blocker using bridge segments to form one degenerate polygon
@@ -62,8 +64,6 @@ export default function generateTriangulation(boundsBlocker, holePolygons, optim
   vertices.forEach((_, i) => setConvexAndAngleFor(vertices, i))
   vertices.forEach((_, i) => setEartipStatus(vertices, i))
 
-  // let eartips_print = vertices.filter(vertex => vertex.eartip)
-
   let triangles = []
   let n = vertices.length
   while (triangles.length < n - 2) {
@@ -76,71 +76,68 @@ export default function generateTriangulation(boundsBlocker, holePolygons, optim
       }
     }
     if (lowest.i === undefined) {
-      console.logString("No eartips?")
       break
     }
     let vPrev = vertices[(lowest.i - 1) < 0 ? vertices.length - 1 : (lowest.i - 1)]
     let v = vertices[lowest.i]
     let vNext = vertices[(lowest.i + 1) % vertices.length]
     if (vPrev === undefined || v === undefined || vNext === undefined) {
-      console.logString(`Vertex count: ${vertices.length} - ${lowest.i}`)
-      throw 'Help'
+      throw 'Vertex issue in pathing.'
     }
+    // Triangulation degenerate polygon is CCW. Vertices are flipped here to form CW polygon
     let triangle = new Polygon([vNext, v, vPrev])
 
-    let edge0 = new Segment(v, vNext)
-    edge0.parent = triangle
-    let edge1 = new Segment(vNext, vPrev)
-    edge1.parent = triangle
-    let edge2 = new Segment(vPrev, v)
-    edge2.parent = triangle
+    if (optimize) {
+      let optimizeVertices = [
+        {angle: triangle.interiorAngleVertex(0), oppositeEdge: triangle.edges()[1]},
+        {angle: triangle.interiorAngleVertex(1), oppositeEdge: triangle.edges()[2]},
+        {angle: triangle.interiorAngleVertex(2), oppositeEdge: triangle.edges()[0]}
+      ].sort((e1, e2) => e1.angle < e2.angle)
 
-    triangle.edges = [edge0, edge1, edge2]
+      if (optimizeVertices.some(v => v.angle < TRIANGULATION_ANGLE_BOUND)) {
+        // Optimize triangle
+        let optimizeVertex = optimizeVertices[0]
+        let peerEdge = getPeerEdge(triangles, optimizeVertex.oppositeEdge)
+        if (peerEdge !== undefined) {
+          let peerPolygon = peerEdge.parent
+          log(`Optimizing edge T${optimizeVertex.oppositeEdge.logString()} of ${triangle.logString()}`, [optimizeVertex.oppositeEdge, triangle, peerPolygon])
+          let reformPolygon1 = new Polygon([
+            peerPolygon.vertices[peerPolygon.vertices.indexOf(peerEdge.b())],
+            peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b()) + 1) % peerPolygon.vertices.length],
+            triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b()) + 1) % triangle.vertices.length]
+          ])
+          let reformPolygon2 = new Polygon([
+            triangle.vertices[triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b())],
+            triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b()) + 1) % triangle.vertices.length],
+            peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b()) + 1) % peerPolygon.vertices.length]
+          ])
+          log(`  Created new triangles ${reformPolygon1.logString()}.`, [reformPolygon1, reformPolygon2])
 
-    let optimizeVertices = [
-      {angle: getVectorAngle(new Vector(vNext.x - vPrev.x, vNext.y - vPrev.y), new Vector(v.x - vPrev.x, v.y - vPrev.y)), oppositeEdge: edge0}, // vPrev
-      {angle: getVectorAngle(new Vector(vPrev.x - v.x, vPrev.y - v.y), new Vector(vNext.x - v.x, vNext.y - v.y)), oppositeEdge: edge1}, // v
-      {angle: getVectorAngle(new Vector(v.x - vNext.x, v.y - vNext.y), new Vector(vPrev.x - vNext.x, vPrev.y - vNext.y)), oppositeEdge: edge2} // vNext
-    ]
+          let smallestOriginalAngle = optimizeVertices[2].angle
+          peerPolygon.vertices.forEach((_, i) => {
+            let angle = peerPolygon.interiorAngleVertex(i)
+            if (angle < smallestOriginalAngle) smallestOriginalAngle = angle
+          })
 
-    if (optimize && (optimizeVertices[0].angle < TRIANGULATION_ANGLE_BOUND || optimizeVertices[1].angle < TRIANGULATION_ANGLE_BOUND || optimizeVertices[2].angle < TRIANGULATION_ANGLE_BOUND)) {
-      // Optimize triangle
-      let optimizeVertex = optimizeVertices[0]
-      let smallestAngle = optimizeVertices[0].angle
-      for (let i = 1; i < optimizeVertices.length; i++) {
-        if (optimizeVertices[i].angle > optimizeVertex.angle) optimizeVertex = optimizeVertices[i]
-        if (optimizeVertices[i].angle < smallestAngle) v = optimizeVertices[i].angle
-      }
-      let peerEdge = getPeerEdge(triangles, optimizeVertex.oppositeEdge)
-      if (peerEdge !== undefined) {
-        let peerPolygon = peerEdge.parent
-        let reformPolygon1 = new Polygon([
-          peerPolygon.vertices[peerPolygon.vertices.indexOf(peerEdge.b())],
-          peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b()) + 1) % peerPolygon.vertices.length],
-          triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b()) + 1) % triangle.vertices.length]
-        ])
-        let reformPolygon2 = new Polygon([
-          triangle.vertices[triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b())],
-          triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b()) + 1) % triangle.vertices.length],
-          peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b()) + 1) % peerPolygon.vertices.length]
-        ])
+          let smallestNewAngle = Math.PI
+          reformPolygon1.vertices.forEach((_, i) => {
+            let angle = reformPolygon1.interiorAngleVertex(i)
+            if (angle < smallestNewAngle) smallestNewAngle = angle
+          })
+          reformPolygon2.vertices.forEach((_, i) => {
+            let angle = reformPolygon2.interiorAngleVertex(i)
+            if (angle < smallestNewAngle) smallestNewAngle = angle
+          })
 
-        let vPrev = vertices[(lowest.i - 1) < 0 ? vertices.length - 1 : (lowest.i - 1)]
-        let v = vertices[lowest.i]
-        let vNext = vertices[(lowest.i + 1) % vertices.length]
-        let triangle = new Polygon([vNext, v, vPrev])
+          if (smallestOriginalAngle < smallestNewAngle) {
+            log(`    New triangles accepted.`)
+            triangle = reformPolygon1
+            triangles.splice(triangles.indexOf(peerPolygon), 1, reformPolygon2)
+          }
 
-        let edge0 = new Segment(v, vNext)
-        edge0.parent = triangle
-        let edge1 = new Segment(vNext, vPrev)
-        edge1.parent = triangle
-        let edge2 = new Segment(vPrev, v)
-        edge2.parent = triangle
-
-        triangle.edges = [edge0, edge1, edge2]
-
-        triangle = reformPolygon1
-        triangles.splice(triangles.indexOf(peerPolygon), 1, reformPolygon2)
+        //   triangle = reformPolygon1
+        //   triangles.splice(triangles.indexOf(peerPolygon), 1, reformPolygon2)
+        }
       }
     }
 
@@ -211,9 +208,9 @@ function setNeighbors(triangles) {
     for (let p = 0; p < triangles.length; p++) {
       if (i == p) continue
       let peerPolygon = triangles[p]
-      polygon.edges.forEach(edge => {
+      polygon.edges().forEach(edge => {
         if (edge.peer !== undefined) return
-        peerPolygon.edges.forEach(peerEdge => {
+        peerPolygon.edges().forEach(peerEdge => {
           if (peerEdge.peer !== undefined) return
           if (edge.equals(peerEdge.flip())) {
             edge.peer = peerEdge
@@ -231,8 +228,9 @@ function getPeerEdge(peers, edge) {
   if (edge.peer !== undefined) return edge.peer
   for (let p = 0; p < peers.length; p++) {
     let peerPolygon = peers[p]
-    for (let pE = 0; pE < peerPolygon.edges.length; pE++) {
-      let peerEdge = peerPolygon.edges[pE]
+    if (edge.parent == peerPolygon) continue
+    for (let pE = 0; pE < peerPolygon.edges().length; pE++) {
+      let peerEdge = peerPolygon.edges()[pE]
       if (edge.equals(peerEdge.flip())) return peerEdge
     }
   }
