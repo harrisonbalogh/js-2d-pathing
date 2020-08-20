@@ -1,10 +1,12 @@
 import Blocker from './Blocker.js'
-import { Polygon, Point } from './Geometry.js';
+import { Polygon, Point, Segment } from './Geometry.js';
 import getRoute from './Pathfinding.js'
 import generateTriangulation from './Triangulation.js'
+import { mouse } from '../core.js'
 
 let blockers = [];
-let constsructingVertices = []; // Used by editMode
+let constructingVertices = []; // Used by editMode
+let constructingCcw = false
 let needsTriangulation = true
 let triangulationTriangles = undefined
 let boundsBlocker = undefined
@@ -57,12 +59,34 @@ export function renderBlockers(context) {
 }
 
 export function addConstructionPoint(p) {
-  constsructingVertices.push(p);
+  if (constructingVertices.length == 0) {
+    constructingVertices.push(p);
+  } else {
+    let mouseDistToStartSqrd = Segment.distanceSqrd(mouse.loc, constructingVertices[0])
+    if (constructingVertices.length > 2) {
+      if (mouseDistToStartSqrd < 64) {
+        finishConstruction()
+        return
+      } else {
+        constructingVertices.push(p);
+      }
+    } else if (mouseDistToStartSqrd > 64) {
+      constructingVertices.push(p);
+    }
+
+    let averageSlope = 0
+    for (let i = 0; i < constructingVertices.length; i++) {
+      let v = constructingVertices[i]
+      let vNext = constructingVertices[(i + 1) % constructingVertices.length]
+      averageSlope += (vNext.x - v.x) * (vNext.y + v.y)
+    }
+    constructingCcw = (averageSlope > 0)
+  }
 }
 
 export function finishConstruction(p) {
-  if (constsructingVertices.length > 2) newBlocker(constsructingVertices)
-  else if (constsructingVertices.length == 0) {
+  if (constructingVertices.length > 2) newBlocker(constructingVertices)
+  else if (constructingVertices.length == 0 && p !== undefined) {
     // Delete blocker if contains right click
     for (let b = 0; b < blockers.length; b++) {
       if (blockers[b].polygon.containsPoint(p)) {
@@ -75,7 +99,8 @@ export function finishConstruction(p) {
 }
 
 export function clearConstruction() {
-  constsructingVertices = [];
+  constructingVertices = [];
+  constructingCcw = false
 }
 
 export function constructionRender(context) {
@@ -112,23 +137,53 @@ export function constructionRender(context) {
   });
 
   // Draw construction vertices
-  for (let c = 0; c < constsructingVertices.length; c++) {
-    let vertex = constsructingVertices[c];
-    context.strokeStyle = "Red";
-    context.beginPath();
-    context.arc(vertex.x, vertex.y, 3, 0, 2 * Math.PI, false);
-    context.stroke();
-    context.fillStyle = "Red"
-    context.font = '14px sans-serif';
-    context.fillText(vertex.logString(), vertex.x+5, vertex.y-5);
-
+  let mouseDistToStartSqrd = undefined
+  if (constructingVertices.length > 0) {
+    mouseDistToStartSqrd = Segment.distanceSqrd(mouse.loc, constructingVertices[0])
+  }
+  context.strokeStyle = constructingCcw ? "Blue" : "Red";
+  context.fillStyle = constructingCcw ? "Blue" : "Red";
+  context.font = '14px sans-serif';
+  for (let c = 0; c < constructingVertices.length; c++) {
+    let vertex = constructingVertices[c];
+    if (c == 0) {
+      if (constructingVertices.length < 2 || mouseDistToStartSqrd > 64) {
+        context.fillText(vertex.logString(), vertex.x+5, vertex.y-5);
+      } else {
+        context.beginPath();
+        context.arc(vertex.x, vertex.y, 8, 0, 2 * Math.PI, false);
+        context.stroke();
+        context.fillText((constructingVertices.length > 2) ? 'Close Polygon' : 'Too Small', vertex.x+6, vertex.y-6);
+      }
+    } else {
+      context.fillText(vertex.logString(), vertex.x+5, vertex.y-5);
+    }
     if (c > 0) {
-      let vertexPrev = constsructingVertices[c-1];
       context.beginPath();
-      context.moveTo(vertexPrev.x, vertexPrev.y);
+      context.moveTo(constructingVertices[c-1].x, constructingVertices[c-1].y);
       context.lineTo(vertex.x, vertex.y);
       context.stroke();
     }
+    if (c == constructingVertices.length - 1 ) {
+      context.beginPath();
+      context.moveTo(vertex.x, vertex.y);
+      if (mouseDistToStartSqrd > 64) {
+        context.lineTo(mouse.loc.x, mouse.loc.y);
+      } else {
+        context.lineTo(constructingVertices[0].x, constructingVertices[0].y);
+      }
+      context.stroke();
+
+      if (mouseDistToStartSqrd > 64) {
+        context.beginPath();
+        context.arc(mouse.loc.x, mouse.loc.y, 3, 0, 2 * Math.PI, false);
+        context.stroke();
+      }
+    }
+
+    context.beginPath();
+    context.arc(vertex.x, vertex.y, 3, 0, 2 * Math.PI, false);
+    context.stroke();
   }
 }
 

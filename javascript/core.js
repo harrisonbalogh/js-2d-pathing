@@ -15,7 +15,7 @@ let canvas_bg = document.getElementById("bgCanvas")
 let canvasMasterContext = canvas_bg.getContext('2d') // The primary canvas particles are drawn on
 let parallelBarsVisible = false;
 let parallelBarDragging = {top: false, left: false}
-let mouse = {
+export let mouse = {
   loc: new Point(0, 0),
   lastLeftClick: new Point(0, 0),
   lastRightClick: new Point(0, 0)

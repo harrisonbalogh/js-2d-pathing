@@ -26,56 +26,41 @@ body {
 
 header {
   background-color: var(--color-background);
-  height: 38px;
-  overflow: hidden;
+  height: 22px;
+  overflow-y: visible;
   position: fixed;
   width: 100%;
+  text-align: center;
+  z-index: 2;
 }
-.header-logo {
-  background: url("../images/hxr-logo-active@2x.png") no-repeat center/103px;
+.header-label-dev {
   background-color: var(--color-foreground);
-  border-radius: 6px;
-  display: block;
-  height: 80%;
-  margin: 4px auto;
-  padding: 0 4px;
-  width: 103px;
+  border-radius: 0 0 10px 10px;
+  border-style: solid;
+  border-color: var(--color-background);
+  border-width: 0 5px 0 5px;
+  height: 22px;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--color-background);
+  margin: 0 auto;
+  padding-top: 6px;
+  width: 160px;
 }
 
 /* - - - - - - - - - CONTENT - - - - - - - - - */
 
 .content {
   background-color: var(--color-foreground);
-  bottom: 38px;
+  bottom: 0;
   display: flex;
   flex-direction: row;
   left: 0;
   margin: 0;
   overflow: hidden;
-  padding: 40px;
+  padding: 22px;
   position: fixed;
   right: 0;
-  top: 38px;
+  top: 22px;
 }
 
-/* - - - - - - - - - FOOTER - - - - - - - - - */
-
-footer {
-  background-color: var(--color-background);
-  bottom: 0;
-  height: 38px;
-  margin: 0;
-  overflow: hidden;
-  position: fixed;
-  width: 100%;
-}
-
-.footer--label-dev {
-  color: gray;
-  left: 50%;
-  margin: 0;
-  padding: 0;
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
