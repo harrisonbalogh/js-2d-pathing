@@ -9,6 +9,7 @@ let constructingVertices = []; // Used by editMode
 let constructingCcw = false
 let needsTriangulation = true
 let triangulationTriangles = undefined
+let routing = undefined
 let boundsBlocker = undefined
 let IS_BOUNDS_BLOCKER = true
 
@@ -230,6 +231,7 @@ export function route(origin, destination, logged = true) {
     destination = blocker.polygon.closestPointOutsideFrom(destination)
   })
 
+  routing = {origin: origin, destination: destination}
   let routeTriangles = getRoute(getTriangulation(), origin, destination, logged)
 
   triangulationTriangles.forEach(triangle => {
@@ -247,16 +249,17 @@ export function route(origin, destination, logged = true) {
  * Ensure triangles are generated or regenerated if the layout was changed between the last triangulation
  */
 function getTriangulation() {
-  let holePolygons = []
-  blockers.forEach(holeBlocker => {
-    if (holeBlocker == boundsBlocker) return
-    holePolygons.push(holeBlocker.polygon)
-  })
-
-  if (!triangulationTriangles || needsTriangulation) {
+  if (triangulationTriangles === undefined || needsTriangulation) {
+    let holePolygons = []
+    blockers.forEach(holeBlocker => {
+      if (holeBlocker == boundsBlocker) return
+      holePolygons.push(holeBlocker.polygon)
+    })
     triangulationTriangles = generateTriangulation(boundsBlocker, holePolygons, optimizeTriangulation)
+    needsTriangulation = false
+    if (routing !== undefined) route(routing.origin, routing.destination)
   }
-  needsTriangulation = false
+
   return triangulationTriangles
 }
 

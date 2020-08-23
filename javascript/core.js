@@ -328,55 +328,50 @@ bgCanvas.onmouseup = e => {
 }
 
 bgCanvas.onmousemove = e => {
-  if (canvasRunning) {
-    let rect = bgCanvas.getBoundingClientRect();
-    mouse.loc = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top))
+  e.preventDefault()
+  if (!canvasRunning) return
+  let rect = bgCanvas.getBoundingClientRect();
+  mouse.loc = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top))
 
-    // Parallel bar dragging
-    disableLogging(parallelBarDragging.top || parallelBarDragging.left)
-    if (parallelBarDragging.top || parallelBarDragging.left) {
-      if (parallelBarDragging.top) {
-        mouse.lastLeftClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), bgCanvas.width - PARALLEL_SETTER_TOP_X), 0)
-        mouse.lastRightClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), bgCanvas.width - PARALLEL_SETTER_TOP_X), bgCanvas.height)
-      } else
-      if (parallelBarDragging.left) {
-        mouse.lastLeftClick = new Point(0, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), bgCanvas.height - PARALLEL_SETTER_TOP_X))
-        mouse.lastRightClick = new Point(bgCanvas.width, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), bgCanvas.height - PARALLEL_SETTER_TOP_X))
+  // Parallel bar dragging
+  if (parallelBarsVisible) disableLogging(parallelBarDragging.top || parallelBarDragging.left)
+  if (parallelBarDragging.top || parallelBarDragging.left) {
+    if (parallelBarDragging.top) {
+      mouse.lastLeftClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), bgCanvas.width - PARALLEL_SETTER_TOP_X), 0)
+      mouse.lastRightClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), bgCanvas.width - PARALLEL_SETTER_TOP_X), bgCanvas.height)
+    } else
+    if (parallelBarDragging.left) {
+      mouse.lastLeftClick = new Point(0, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), bgCanvas.height - PARALLEL_SETTER_TOP_X))
+      mouse.lastRightClick = new Point(bgCanvas.width, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), bgCanvas.height - PARALLEL_SETTER_TOP_X))
+    }
+  } else if (!editingBlockers) {
+    // Drag pathing
+    if (e.buttons === 1 || e.buttons == 2) {
+      if (e.buttons === 1) {
+        mouse.lastLeftClick = new Point(mouse.loc.x, mouse.loc.y)
+      } else if (e.buttons == 2) {
+        mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
       }
-    } else if (!editingBlockers) {
-      // Drag pathing
-      if (e.buttons === 1 || e.buttons == 2) {
-        if (e.buttons === 1) {
-          mouse.lastLeftClick = new Point(mouse.loc.x, mouse.loc.y)
-        } else if (e.buttons == 2) {
-          mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
-        }
 
-        if (!editingBlockers && gridify) {
-          test_lines = []
-          test_circles = []
-          test_points = []
+      if (!editingBlockers && gridify) {
+        test_lines = []
+        test_circles = []
+        test_points = []
 
-          // let polygons = Layout.route(mouse.lastLeftClick, mouse.lastRightClick, false)
-          // cache_triangulation.forEach(polygon => {
-          //   if (polygons.indexOf(polygon) == -1) {
-          //     polygon.highlighted = false
-          //   } else {
-          //     polygon.highlighted = true
-          //   }
-          // })
-          testLine(mouse.lastLeftClick, mouse.lastRightClick)
-          testPoint(mouse.lastLeftClick.x, mouse.lastLeftClick.y)
-          testPoint(mouse.lastRightClick.x, mouse.lastRightClick.y)
-        }
-      }
-    } else if (editingBlockers && editingBlockersSmooth) {
-      if (editingBlockersSmoothTracking) {
-        Layout.addConstructionPoint(new Point(mouse.loc.x, mouse.loc.y));
+        disableLogging(true)
+        Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
+        disableLogging(false)
+
+        testLine(mouse.lastLeftClick, mouse.lastRightClick)
+        testPoint(mouse.lastLeftClick.x, mouse.lastLeftClick.y)
+        testPoint(mouse.lastRightClick.x, mouse.lastRightClick.y)
       }
     }
+  } else if (editingBlockers && editingBlockersSmooth) {
+    if (editingBlockersSmoothTracking) {
+      Layout.addConstructionPoint(new Point(mouse.loc.x, mouse.loc.y));
+    }
   }
-  e.preventDefault()
 }
 
 bgCanvas.oncontextmenu = e => e.preventDefault()

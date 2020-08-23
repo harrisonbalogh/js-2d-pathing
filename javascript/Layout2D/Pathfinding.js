@@ -31,7 +31,7 @@ export default function getRoute(graph, origin, destination, logged = true) {
 
     if (current === nodes[iDestination]) break
 
-    current.polygon.edges.forEach(edge => {
+    current.polygon.edges().forEach(edge => {
       if (edge.peer === undefined) return
       let next = nodes[graph.indexOf(edge.peer.parent)]
       let frontier = edge.closestPointOnSegmentTo(current.frontier)
