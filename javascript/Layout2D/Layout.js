@@ -255,7 +255,7 @@ function getTriangulation() {
       if (holeBlocker == boundsBlocker) return
       holePolygons.push(holeBlocker.polygon)
     })
-    triangulationTriangles = generateTriangulation(boundsBlocker, holePolygons, optimizeTriangulation)
+    triangulationTriangles = generateTriangulation(boundsBlocker, holePolygons)
     needsTriangulation = false
     if (routing !== undefined) route(routing.origin, routing.destination)
   }

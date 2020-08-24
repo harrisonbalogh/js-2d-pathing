@@ -1,9 +1,10 @@
 import { Segment, Vector, Polygon, Point } from './Geometry.js'
 import log from '../log.js'
+import {optimizeTriangulation as optimize} from './Layout.js'
 
-let TRIANGULATION_ANGLE_BOUND = (20) / 180 * Math.PI
+let TRIANGULATION_ANGLE_BOUND = (30) / 180 * Math.PI
 
-export default function generateTriangulation(boundsBlocker, holePolygons, optimize = false) {
+export default function generateTriangulation(boundsBlocker, holePolygons) {
   log('Generating triangulation.', [], true)
   let vertices = boundsBlocker.vertices().map(vertex => new Point(vertex.x, vertex.y))
 
@@ -95,58 +96,54 @@ export default function generateTriangulation(boundsBlocker, holePolygons, optim
       ].sort((e1, e2) => e1.angle < e2.angle)
 
       if (optimizeVertices.some(v => v.angle < TRIANGULATION_ANGLE_BOUND)) {
-        // Optimize triangle
         let optimizeVertex = optimizeVertices[0]
         let peerEdge = getPeerEdge(triangles, optimizeVertex.oppositeEdge)
         if (peerEdge !== undefined) {
           let peerPolygon = peerEdge.parent
-          log(`Optimizing edge T${optimizeVertex.oppositeEdge.logString()} of ${triangle.logString()}`, [optimizeVertex.oppositeEdge, triangle, peerPolygon])
-          let reformPolygon1 = new Polygon([
-            peerPolygon.vertices[peerPolygon.vertices.indexOf(peerEdge.b())],
-            peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b()) + 1) % peerPolygon.vertices.length],
-            triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b()) + 1) % triangle.vertices.length]
-          ])
-          let reformPolygon2 = new Polygon([
+
+          let quadrilateral = new Polygon([
             triangle.vertices[triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b())],
             triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b()) + 1) % triangle.vertices.length],
+            peerPolygon.vertices[peerPolygon.vertices.indexOf(peerEdge.b())],
             peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b()) + 1) % peerPolygon.vertices.length]
           ])
-          log(`  Created new triangles ${reformPolygon1.logString()}.`, [reformPolygon1, reformPolygon2])
 
-          let smallestOriginalAngle = optimizeVertices[2].angle
-          peerPolygon.vertices.forEach((_, i) => {
-            let angle = peerPolygon.interiorAngleVertex(i)
-            if (angle < smallestOriginalAngle) smallestOriginalAngle = angle
-          })
+          if (quadrilateral.convex()) {
+            let reformPolygon1 = new Polygon([
+              peerPolygon.vertices[peerPolygon.vertices.indexOf(peerEdge.b())],
+              peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b()) + 1) % peerPolygon.vertices.length],
+              triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b()) + 1) % triangle.vertices.length]
+            ])
+            let reformPolygon2 = new Polygon([
+              triangle.vertices[triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b())],
+              triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b()) + 1) % triangle.vertices.length],
+              peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b()) + 1) % peerPolygon.vertices.length]
+            ])
 
-          let smallestNewAngle = Math.PI
-          reformPolygon1.vertices.forEach((_, i) => {
-            let angle = reformPolygon1.interiorAngleVertex(i)
-            if (angle < smallestNewAngle) smallestNewAngle = angle
-          })
-          reformPolygon2.vertices.forEach((_, i) => {
-            let angle = reformPolygon2.interiorAngleVertex(i)
-            if (angle < smallestNewAngle) smallestNewAngle = angle
-          })
+            let smallestOriginalAngle = optimizeVertices[2].angle
+            peerPolygon.vertices.forEach((_, i) => {
+              let angle = peerPolygon.interiorAngleVertex(i)
+              if (angle < smallestOriginalAngle) smallestOriginalAngle = angle
+            })
 
-          if (smallestOriginalAngle < smallestNewAngle) {
-            log(`    New triangles accepted.`)
-            triangle = reformPolygon1
-            triangles.splice(triangles.indexOf(peerPolygon), 1, reformPolygon2)
+            let smallestNewAngle = Math.PI
+            reformPolygon1.vertices.forEach((_, i) => {
+              let angle = reformPolygon1.interiorAngleVertex(i)
+              if (angle < smallestNewAngle) smallestNewAngle = angle
+            })
+            reformPolygon2.vertices.forEach((_, i) => {
+              let angle = reformPolygon2.interiorAngleVertex(i)
+              if (angle < smallestNewAngle) smallestNewAngle = angle
+            })
+
+            if (smallestOriginalAngle < smallestNewAngle) {
+              triangle = reformPolygon1
+              triangles.splice(triangles.indexOf(peerPolygon), 1, reformPolygon2)
+            }
           }
-
-        //   triangle = reformPolygon1
-        //   triangles.splice(triangles.indexOf(peerPolygon), 1, reformPolygon2)
         }
       }
     }
-
-    // Quality check (Optional)
-    // get vertex with largest angle and select opposite edge.
-    // find another generated triangle that shares the opposite edge
-    // combine these triangles to form quadrilateral.
-    // split quad into 2 new triangles along the other diagonal (not original diagonal)
-    // if the minimum angle of these triangles is less than originals, swap out for these triangles.
 
     triangles.push(triangle)
 

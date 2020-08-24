@@ -687,6 +687,14 @@ export class Polygon {
     return closest.point // new Segment(point, closest.point).vector().extendBy(1).asPoint().add(point)
   }
 
+  /**
+   * Get the interior angle of the vertex within the polygon.
+   *
+   * @param Vertex vertex is a vertex object in the polygon's vertices array or an int
+   * for the index number of the vertex to return the angle for.
+   *
+   * @returns the angle in radians of the edges meeting at the vector
+   */
   interiorAngleVertex(vertex) {
     let v = (typeof vertex === 'number') ? vertex : this.vertices.indexOf(vertex)
     vertex = this.vertices[v]
@@ -694,8 +702,16 @@ export class Polygon {
     let vNext = this.vertices[(v + 1) % this.vertices.length]
     let toPrev = new Vector(vPrev.x - vertex.x, vPrev.y - vertex.y)
     let toNext = new Vector(vNext.x - vertex.x, vNext.y - vertex.y)
-    let r = Math.acos(toPrev.dotProduct(toNext) / (toPrev.magnitude() * toNext.magnitude()))
-    return this.counterclockwise ? 2 * Math.PI - r : r
+    let a = (toPrev.angle() - toNext.angle() + Math.PI * 2) % (Math.PI * 2)
+    return this.counterclockwise ? 2 * Math.PI - a : a
+  }
+
+  /** Check if the polygon is convex. */
+  convex() {
+    return !this.concave()
+  }
+  concave() {
+    return this.vertices.some(v => this.interiorAngleVertex(v) > Math.PI)
   }
 
   logString() {

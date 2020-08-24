@@ -4,6 +4,9 @@ import Blocker from './Layout2D/Blocker.js'
 let logData = []
 let logSelected = undefined
 let loggingDisabled = false
+/**
+ * Override logging globally. Useful for capturing logs under a certain condition.
+ */
 export function disableLogging(val) {
   loggingDisabled = val
 }
