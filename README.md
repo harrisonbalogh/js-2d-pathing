@@ -4,11 +4,11 @@ Working on pathing algorithm without grid spaces in javascript 2D space.
 
 TODO:
 
-Optimize pathing needs completed implementation. This should clean up long sliver
-triangles. If it doesn't: find a way to combine triangles to remove slivers.
+DONE - Optimize pathing needs completed implementation.
 
-After slivers are removed, check pathing heuristic. This may roll into how the
-path is actually taken between neighboring triangles. If not: see next task.
+Add delauny triangulation to create optimal graph.
+
+Check pathing heuristic. Where to enter from neighboring triangles.
 
 Form actual travel path between neighboring triangles from pathing calculation.
 
