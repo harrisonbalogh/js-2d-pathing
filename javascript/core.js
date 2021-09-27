@@ -1,7 +1,7 @@
 import './Layout2D/Error.js'
 import { Point } from './Layout2D/Geometry.js'
 import * as Layout from './Layout2D/Layout.js'
-import { renderLogData, disableLogging, setup as logSetup } from './log.js'
+import { renderLogData, disableLogging, selectLogNext, selectLogPrev, setup as logSetup } from './log.js'
 import log from './log.js'
 
 // Classes in JavaScript are not hoisted! Variables/functions are lifted to the top of their scope for order-less reference
@@ -48,7 +48,6 @@ function settingToggle(elem, logic) {
 }
 function toggleCanvasRunning() {
   canvasRunning = !canvasRunning
-  document.getElementById('setting-item-updateToggle').className = document.getElementById('setting-item-updateToggle').className == "active" ? "" : "active"
   if (!canvasUpdating && canvasRunning) update()
 }
 function toggleMouseLabel() {
@@ -256,13 +255,43 @@ function update(delta) {
 
 // ======================================================================================================================= Launch =====
 
-document.onkeypress = e => {
-  e = e || window.event;
-  // pressing 'spacebar'
-  if (e.keyCode == 32) {
-    toggleCanvasRunning();
+const KEY_CODE = {
+  ARROW_UP: 38,
+  ARROW_DOWN: 40,
+  SPACEBAR: 32,
+  G: 71,
+  E: 69,
+  M: 77,
+  P: 80
+}
+const handleKeyDown = keyDownEvent => {
+  keyDownEvent = keyDownEvent || window.event;
+  // log(`Log key: ${keyDownEvent.keyCode}`)
+  switch(keyDownEvent.keyCode) {
+    case KEY_CODE.ARROW_UP:
+      selectLogPrev(); 
+      break;
+    case KEY_CODE.ARROW_DOWN:
+      selectLogNext();
+      break;
+    case KEY_CODE.SPACEBAR:
+      settingToggle(document.getElementById('setting-item-updateToggle'), toggleCanvasRunning);
+      break;
+    case KEY_CODE.G:
+      settingToggle(document.getElementById('setting-item-gridified'), toggleGridified);
+      break;
+    case KEY_CODE.E:
+      settingToggle(document.getElementById('setting-item-editMode'), toggleEditMode);
+      break;
+    case KEY_CODE.M:
+      settingToggle(document.getElementById('setting-item-mouseLabelToggle'), toggleMouseLabel);
+      break;
+    case KEY_CODE.P:
+      printLayout();
+      break;
   }
 }
+document.addEventListener('keydown', handleKeyDown)
 
 bgCanvas.onmousedown = e => {
   if (editingBlockers) {

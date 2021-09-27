@@ -3,3 +3,7 @@ Steiner Points - Points added to triangulation set to improve quality
 Delauny Triangulation - if none of the points in a triangulation are inside
 the circumcircle of any triangle in the triangulation.
 Delauny Refinement - Given a PSLG (set of vertices and non-intersecting edges), insert steiner points until minimum angle is achieved.
+
+
+Homotopy - A path that is "similar" to another path. Avoids the same obstacles.
+Homotopy class - All the paths that are "similar".

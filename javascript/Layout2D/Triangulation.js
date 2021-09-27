@@ -1,9 +1,16 @@
 import { Segment, Vector, Polygon, Point } from './Geometry.js'
 import log from '../log.js'
 import {optimizeTriangulation as optimize} from './Layout.js'
+import Blocker from './Blocker.js'
 
 let TRIANGULATION_ANGLE_BOUND = (30) / 180 * Math.PI
 
+/**
+ * Apply delauny triangulation to obtain an array of edge-sharing triangles.
+ * @param {Blocker} boundsBlocker Blocker containing all holes for triangulation.
+ * @param {[Polygon]} holePolygons Holes to be avoided when triangulating.
+ * @returns {[Polygon]} an array of triangles
+ */
 export default function generateTriangulation(boundsBlocker, holePolygons) {
   log('Generating triangulation.', [], true)
   let vertices = boundsBlocker.vertices().map(vertex => new Point(vertex.x, vertex.y))

@@ -5,7 +5,7 @@ import {Segment, Line, Ray, Vector, Polygon, Point, extrudeVertices} from './Geo
  * blockers array to create the world graph layout. Each object will track its original constructing
  * vertices but its final polygon may be altered in the case of unions or holes.
  * @param polygon - Polygon that make up a blocker.
- * @param originalVertices - Array of vertices that formed this blocker's polygon before union.
+ * @param originalVertices - Array of vertices that formed this blocker's polygon before union. For visuals.
  */
 export default class Blocker {
   constructor(polygon, originalVertices) {

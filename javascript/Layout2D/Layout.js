@@ -9,11 +9,12 @@ let constructingVertices = []; // Used by editMode
 let constructingCcw = false
 let needsTriangulation = true
 let triangulationTriangles = undefined
+let pathfindingRoute = []
 let routing = undefined
 let boundsBlocker = undefined
 let IS_BOUNDS_BLOCKER = true
 
-export let optimizeTriangulation = false
+export let optimizeTriangulation = true
 export function triangulationOptimized(val) {
   if (val != optimizeTriangulation) {
     needsTriangulation = true
@@ -232,17 +233,16 @@ export function route(origin, destination, logged = true) {
   })
 
   routing = {origin: origin, destination: destination}
-  let routeTriangles = getRoute(getTriangulation(), origin, destination, logged)
+  let route = getRoute(getTriangulation(), origin, destination, logged)
 
-  triangulationTriangles.forEach(triangle => {
-    if (routeTriangles.indexOf(triangle) == -1) {
-      triangle.highlighted = false
-    } else {
-      triangle.highlighted = true
-    }
-  })
+  let routePolygons = (route.route || []).map(r => r.polygon)
+  triangulationTriangles.forEach(triangle => triangle.highlighted = routePolygons.includes(triangle))
 
-  return routeTriangles
+  let pathBuilder = []
+  for (let p = 1; p < (route.path || []).length; p++) {
+    pathBuilder.push(new Segment(route.path[p-1], route.path[p]))
+  }
+  pathfindingRoute = pathBuilder
 }
 
 /**
@@ -282,6 +282,24 @@ export function renderTriangulation(context) {
     if (!polygon.counterclockwise) context.fill()
     context.stroke();
   });
+
+  pathfindingRoute.forEach(segment => {
+    context.strokeStyle = "rgba(255, 50, 50, 1)"
+    context.fillStyle = "rgba(255, 100, 100, 1)"
+    
+    context.beginPath()
+    context.arc(segment.a().x, segment.a().y, 4, 0, 2 * Math.PI, false)
+    context.stroke()
+    context.beginPath()
+    context.arc(segment.b().x, segment.b().y, 4, 0, 2 * Math.PI, false)
+    context.fill()
+    context.beginPath()
+    context.moveTo(segment.a().x, segment.a().y)
+    context.lineTo(segment.b().x, segment.b().y)
+    context.stroke()
+    context.fillText(segment.a().logString(), segment.a().x+5, segment.a().y - 5)
+    context.fillText(segment.b().logString(), segment.b().x+5, segment.b().y - 5)
+  })
 }
 
 export function saveToCookies() {

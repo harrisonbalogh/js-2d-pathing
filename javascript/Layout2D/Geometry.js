@@ -88,6 +88,7 @@ export class Segment {
   vector() {
     return new Vector(this._b.x - this._a.x, this._b.y - this._a.y);
   }
+
   line() {
     return new Line(this._a, this._b);
   }
@@ -125,6 +126,16 @@ export class Segment {
     return new Point(this._a.x + dX/2, this._a.y + dY/2)
   }
 
+  /**
+   * Determine the side which a point lies based on direction of a segment from A to B.
+   * Technically, this is the cross product between this segment and a segment from A to the point.
+   * @param {Point} point The point to check which side it lies on in reference to the segment.
+   * @returns {Integer} A positive value indicates the left side, a negative value the right side.
+   */
+  directionTo(point) {
+    return this.vector().crossProduct(Vector.fromSegment(this.a(), point)) * -1
+  }
+
   closestPointOnSegmentTo(point) {
     let aToPoint = new Segment(this._a, point)
     let proj = aToPoint.vector().projection(this.vector())
@@ -137,6 +148,7 @@ export class Segment {
   static distanceSqrd(a, b) {
     return new Segment(a, b).distanceSqrd()
   }
+
   static distance(a, b) {
     return new Segment(a, b).distance()
   }
@@ -392,6 +404,10 @@ export class Vector {
     if (dotProd > this.magnitudeSqrd()) return false;
 
     return (perp.magnitudeSqrd() < radiusSqrd);
+  }
+
+  static fromSegment(a, b) {
+    return new Vector(b.x - a.x, b.y - a.y);
   }
 }
 

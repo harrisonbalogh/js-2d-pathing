@@ -12,8 +12,13 @@ export function disableLogging(val) {
 }
 
 let contentOut = undefined
-export function setup(ul) {
-  contentOut = ul
+/**
+ * Setup on-screen log out with a ul element for text output.
+ * 
+ * @param {ul} list_element html element of list type to push text list items to
+ */
+export function setup(list_element) {
+  contentOut = list_element
 }
 
 /**
@@ -23,7 +28,7 @@ export function setup(ul) {
  */
 export default function log(text, data, flush) {
   if (loggingDisabled) return
-  if (!contentOut) throw 'Bad log setup()'
+  if (!contentOut) throw 'Logging was not configured with a list element with setup() call'
 
   // Optional(overloaded) parameter handling...
   if (!Array.isArray(data)) {
@@ -31,6 +36,12 @@ export default function log(text, data, flush) {
     data = [];
   } else flush = flush || false;
   let li = document.createElement("li");
+
+  // Clone data objects
+  data = data.map(d => {
+    let clone = Object.create(d);
+    return Object.assign(clone, d)
+  })
 
   li.innerHTML = text;
   li.onmouseenter = () => {
@@ -40,6 +51,7 @@ export default function log(text, data, flush) {
     if (logSelected !== undefined) logSelected.style.backgroundColor = ""
     if (li === logSelected) logSelected = undefined
     else {
+      logData = data
       logSelected = li
       logSelected.style.backgroundColor = "darkgray"
     }
@@ -48,11 +60,33 @@ export default function log(text, data, flush) {
     if (logSelected === undefined) logData = []
   }
   if (flush) {
+    logSelected = undefined
     contentOut.innerHTML = "";
-    contentOut.appendChild(li);
-  } else {
-    contentOut.appendChild(li);
+    logData = [] 
   }
+  contentOut.appendChild(li);
+  console.log(text)
+}
+
+const getLogSelectedIndex = () => {
+  if (logSelected === undefined) return undefined
+  let items = contentOut.children
+  for (let c = 0; c < items.length; c++) {
+    if (items[c] === logSelected) {
+      return c
+    }
+  }
+}
+export function selectLogPrev() {
+  let c = getLogSelectedIndex()
+  if (c === undefined || c == 0) return
+  contentOut.children[c - 1].dispatchEvent(new Event('mousedown'));
+}
+
+export function selectLogNext() {
+  let c = getLogSelectedIndex()
+  if (c === undefined || c == contentOut.children.length - 1) return 
+  contentOut.children[c + 1].dispatchEvent(new Event('mousedown'));
 }
 
 export function renderLogData(context) {
@@ -108,5 +142,5 @@ export function renderLogData(context) {
 
 window.onerror = (message, url, linenumber) => {
   let file = url.substring(url.lastIndexOf('/') + 1)
-  log(`${file}:${linenumber} - ${message}`, true)
+  log(`${file}:${linenumber} - ${message}`, false)
 }
