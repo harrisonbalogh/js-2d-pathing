@@ -687,7 +687,13 @@ export class Polygon {
   }
 
   // TODO: Fails edge cases.
-  closestPointOutsideFrom(point) {
+  /**
+   * Attempts to find the shortest line out of the polygon from a given point.
+   * @param {Point} point Inside the polygon to leave from 
+   * @param {Number} extrude_amount Amount to buffer out the exit point
+   * @returns 
+   */
+  closestPointOutsideFrom(point, extrude_amount) {
     if (!this.containsPoint(point)) return point
     // Find closest point outside of polygon
     let closest = { distSqrd: undefined, point: undefined }
@@ -700,7 +706,7 @@ export class Polygon {
       }
     });
     // Extend out result by 1 unit to avoid rounding errors
-    return closest.point // new Segment(point, closest.point).vector().extendBy(1).asPoint().add(point)
+    return new Segment(point, closest.point).vector().extendBy(2).asPoint().add(point) // closest.point
   }
 
   /**

@@ -112,10 +112,14 @@ function createPath(route, start, finish, logged) {
  */
 function createShortestPath(route, start, finish, logged) {
   let tail = [start] // {[Point]}
+  let apex = () => tail[tail.length - 1] // latest tail point
   let left = [] // {[Point]}
   let right = [] // {[Point]}
+  let boundaryIncludes = (boundary, point) => boundary.some(p => p.equals(point));
+  if (route.length == 1) return tail.concat(finish)
+
   let COUNTERR = 0
-  for (let i = 0; i < route.length - 1; i++) {
+  routeEdges: for (let i = 0; i < route.length - 1; i++) {
     if (COUNTERR > 10) {
       log("Break 2")
       return
@@ -126,7 +130,7 @@ function createShortestPath(route, start, finish, logged) {
     log(`  Crossing ${edge.logString()}`, [exitSegment, edge])
 
     let lPoint, rPoint;
-    // Check edge endpoint directionality
+    // Check crossing-edge endpoint boundary-side
     let logStringL = '', logStringR = '';
     if (exitSegment.directionTo(edge.a()) > 0) {
       lPoint = edge.a()
@@ -139,132 +143,181 @@ function createShortestPath(route, start, finish, logged) {
       logStringL = `    B is left. ${edge.b().logString()}`
       logStringR = `    A is right. ${edge.a().logString()}`
     }
-    // Left boundary
+
+    // Left boundary checks
     log(logStringL, [exitSegment, edge.b()])
-    let COUNTERR2 = 0
-    if (!left.includes(lPoint)) {
-      if (COUNTERR2 > 20) {
-        log("Break 3")
-        return
-      }
-      // Verify left array
-      let lPrev = tail[tail.length - 1]
-      let leftBoundaries = left.length
-      for (let l = 0; l < leftBoundaries; l++) {
-        let lEdge = new Segment(lPrev, left[l])
-        log(`     Check L ${lEdge.logString()}`, [lEdge, lPoint])
-        if (lEdge.directionTo(lPoint) < 0) {
-          // On right side of left boundary segment. Check right boundary
-          let onLeftofRightBoundary = true
-          let rPrev = tail[tail.length - 1]
-          for (let r = 0; r < right.length; r++) {
-            let rEdge = new Segment(rPrev, right[r])
-            if (rEdge.directionTo(lPoint) < 0) {
-              // On right side of right boundary segment - Common vertices (3)
-              log(`      Common vertex. ${rPoint.logString()}`, tail)
-              left = [rPoint]
-              l = leftBoundaries
-              tail.push(right.splice(0, 1))
-              r--;
-              onLeftofRightBoundary = false;
-            }
-            rPrev = right[r];
-          }
-          if (onLeftofRightBoundary) {
-            // On left side of right boundary segment - Tighter boundary (1)
-            log(`      Tighter bound L. ${left[l].logString()} to ${lPoint.logString()} (tail: ${tail.length})`, [...tail, ...left, lEdge, lPoint])
-            left[l] = lPoint
-          }
-        } else {
-          // Left side of left boundary segment - Expand funnel (2)
-          log(`      Expand funnel L. ${lPoint.logString()}`, [...tail, ...left])
-          left.push(lPoint)
-        }
-        lPrev = left[l];
-      }
-      if (left.length == 0) {
+    if (left.length == 0) {
+      if (apex().equals(lPoint)) {
+        log(`     Apex is left point. Skip ${lPoint.logString()}`, [...tail])
+      } else {
         log(`     First point L. Push: ${lPoint.logString()}`, [...tail, lPoint])
         left.push(lPoint)
       }
     } else {
-      log(`     Left includes ${lPoint.logString()}`, [...left])
-    }
-    log(logStringR, [exitSegment, edge.a()])
-    let COUNTERR3 = 0
-    // Right boundary
-    if (!right.includes(rPoint)) {
-      if (COUNTERR3 > 20) {
-        log("Break 4")
-        return
-      }
-      // Verify right array
-      let rPrev = tail[tail.length - 1]
-      let rightBoundaries = right.length
-      for (let r = 0; r < rightBoundaries; r++) {
-        let rEdge = new Segment(rPrev, right[r])
-        log(`     Check R ${rEdge.logString()}`, [rEdge, rPoint])
-        if (rEdge.directionTo(rPoint) > 0) {
-          // On left side of right boundary segment. Check left boundary
-          let onRightOfLeftBoundary = true
-          let lPrev = tail[tail.length - 1]
-          for (let l = 0; l < left.length; l++) {
-            let lEdge = new Segment(lPrev, left[l])
-            if (lEdge.directionTo(rPoint) > 0) {
-              // On left side of left boundary segment - Common vertices (3)
-              log(`      Common vertex. ${lPoint.logString()}`, tail)
-              r = rightBoundaries
-              right = [lPoint]
-              tail.push(left.splice(0, 1))
-              l--;
-              onRightOfLeftBoundary = false;
-            }
-            lPrev = left[l];
-          }
-          if (onRightOfLeftBoundary) {
-            // On right side of left boundary segment - Tighter boundary (1)
-            log(`      Tighter bound R. ${right[r].logString()} to ${rPoint.logString()} (tail: ${tail.length})`, [...tail, ...right, rEdge, rPoint])
-            right[r] = rPoint
-          }
-        } else {
-          // On right side of right boundary segment - Expand funnel (2)
-          right.push(rPoint)
-          log(`      Expand funnel R. ${rPoint.logString()}`, [...tail, ...right])
+      let COUNTERR2 = 0
+      if (!boundaryIncludes(left, lPoint)) {
+        if (COUNTERR2 > 20) {
+          log("Break 3")
+          return
         }
-        rPrev = right[r]
+        // Check leftBound for funnel expansion, tighter bounds, or common vertex
+        let lPrev = apex()
+        let leftBoundaries = left.length
+        for (let l = 0; l < leftBoundaries; l++) {
+          let lEdge = new Segment(lPrev, left[l])
+          log(`     Check L ${lEdge.logString()}`, [lEdge, lPoint])
+  
+          if (lEdge.directionTo(lPoint) < 0) { // Right side of left boundary segment
+  
+            // Check right boundary
+            let onLeftofRightBoundary = true
+            if (l == 0) { // If checking first right boundary segment
+              for (let r = 0; r < right.length; r++) {
+                let rEdge = new Segment(apex(), right[r])
+                log(`      Check R ${rEdge.logString()}`, [rEdge, lPoint])
+  
+                if (rEdge.directionTo(lPoint) < 0) { // Right side of right boundary segment
+                  // Common vertices (3)
+                  tail.push(...right.splice(0, 1))
+                  log(`      Common vertex. ${apex().logString()} (left: ${left.length}) (right: ${right.length})`, [...tail])
+                  r--;
+                  onLeftofRightBoundary = false;
+                } else { // Left side of right boundary segment
+                  break; // Stop common vertex check on right
+                }
+              }
+            }
+  
+            if (onLeftofRightBoundary) { // Left side of right boundary segment
+              // Tighter boundary (1)
+              left = left.slice(0, l) // Remove wider bounds
+              left.push(lPoint)
+              log(`      Tighter bound L. ${lEdge.b().logString()} to ${lPoint.logString()} (left: ${left.length})`, [apex(), ...left])
+            } else {
+              left = [lPoint] // Move up left
+              continue routeEdges; // Skip the right boundary check
+            }
+            break // If right of left segment boundary, ignore rest of left boundary
+  
+          } else if (l == leftBoundaries - 1) { // Left side of left boundary segment
+            // Expand funnel (2) if last bound checked
+            left.push(lPoint)
+            log(`      Expand funnel L. ${lPoint.logString()} (left ${left.length})`, [...tail, ...left])
+          }
+  
+          lPrev = left[l];
+        }
+      } else {
+        log(`     Left includes ${lPoint.logString()}`, [...left])
       }
-      if (right.length == 0) {
+    }
+
+
+    // Right boundary checks
+    log(logStringR, [exitSegment, edge.a()])
+    if (right.length == 0) {
+      if (apex().equals(rPoint)) {
+        log(`     Apex is right point. Skip ${rPoint.logString()}`, [...tail])
+      } else {
         log(`     First point R. Push: ${rPoint.logString()}`, [...tail, rPoint])
         right.push(rPoint)
       }
     } else {
-      log(`     Right includes ${rPoint.logString()}`, [...right])
+      let COUNTERR3 = 0
+      if (!boundaryIncludes(right, rPoint)) {
+        if (COUNTERR3 > 20) {
+          log("Break 4")
+          return
+        }
+        // Check rightBound for funnel expansion, tighter bounds, or common vertex
+        let rPrev = apex()
+        let rightBoundaries = right.length
+        for (let r = 0; r < rightBoundaries; r++) {
+          let rEdge = new Segment(rPrev, right[r])
+          log(`     Check R ${rEdge.logString()}`, [rEdge, rPoint])
+          
+          if (rEdge.directionTo(rPoint) > 0) { // Left side of right boundary segment
+  
+            // Check left boundary 
+            let onRightOfLeftBoundary = true
+            if (r == 0) { // If checking first right boundary segment
+              for (let l = 0; l < left.length; l++) {
+                let lEdge = new Segment(apex(), left[l])
+                log(`      Check L ${lEdge.logString()}`, [lEdge, rPoint])
+    
+                if (lEdge.directionTo(rPoint) > 0) { // Left side of left boundary segment
+                  // Common vertices (3)
+                  tail.push(...left.splice(0, 1))
+                  log(`      Common vertex. ${apex().logString()} (left: ${left.length}) (right: ${right.length})`, [...tail])
+                  l--;
+                  onRightOfLeftBoundary = false;
+                } else { // Right side of left boundary segment
+                  break; // Stop common vertex check on left
+                }
+              }
+            }
+  
+            if (onRightOfLeftBoundary) { // Right side of left boundary segment
+              // Tighter boundary (1)
+              right = right.slice(0, r) // Remove wider bounds
+              right.push(rPoint)
+              log(`      Tighter bound R. ${rEdge.b().logString()} to ${rPoint.logString()} (right: ${right.length})`, [apex(), ...right])
+            } else {
+              right = [rPoint] // Move up right
+            }
+            break // If left of right segment boundary, ignore rest of right boundary
+  
+          } else if (r == rightBoundaries - 1) { // Right side of right boundary segment
+            // Expand funnel (2) if last right bound checked
+            right.push(rPoint)
+            log(`      Expand funnel R. ${rPoint.logString()} (right: ${right.length})`, [...tail, ...right])
+          }
+  
+          rPrev = right[r]
+        }
+      } else {
+        log(`     Right includes ${rPoint.logString()}`, [...right])
+      }
     }
   }
 
-  let lIntersection, rIntersection;
-  do {
-    let goalEdge = new Segment(tail[tail.length - 1], finish)
-    lIntersection = false
-    rIntersection = false
-    let lPrev = tail[tail.length - 1]
-    for (let l = 0; l < left.length; l++) {
-      let lEdge = new Segment(lPrev, left[l])
-      if (lEdge.intersects(goalEdge)) {
-        tail = tail.concat(left.splice(0, l + 1))
-        lIntersection = true
-      }
-      lPrev = left[l]
+  log(`  Final funnel computed from tail.`, tail)
+  let goalEdge = new Segment(apex(), finish)
+  let intersectedL = false
+  log(`   L.`, left)
+  for (let l = 0; l < left.length; l++) {
+    let lEdge = new Segment(apex(), left[0])
+    log(`   Goal: ${goalEdge.logString()}`, [goalEdge, lEdge])
+    if (lEdge.directionTo(finish) > 0) {
+      tail.push(...left.splice(0, 1))
+      l--;
+      intersectedL = true
+      log(`   Shortening path (left: ${left.length}).`, tail)
+    } else {
+      break
     }
-    let rPrev = tail[tail.length - 1]
-    for (let r = 0; r < right.length; r++) {
-      let rEdge = new Segment(rPrev, right[r])
-      if (rEdge.intersects(goalEdge)) {
-        tail = tail.concat(right.splice(0, r + 1))
-        rIntersection = true
-      }
-      rPrev = right[r]
+    goalEdge = new Segment(apex(), finish)
+  }
+  if (intersectedL) {
+    tail.push(finish)
+    log("Shortest path.", tail)
+    return tail;
+  }
+
+  log(`   R.`, right)
+  for (let r = 0; r < right.length; r++) {
+    let rEdge = new Segment(apex(), right[0])
+    log(`   Goal: ${goalEdge.logString()}`, [goalEdge, rEdge])
+    if (rEdge.directionTo(finish) < 0) {
+      tail.push(...right.splice(0, 1))
+      r--;
+      log(`   Shortening path (right: ${right.length}).`, tail)
+    } else {
+      break
     }
-  } while(lIntersection || rIntersection)
+    goalEdge = new Segment(apex(), finish)
+  }
+
   tail.push(finish)
   log("Shortest path.", tail)
   return tail;

@@ -17,7 +17,7 @@ let contentOut = undefined
  * 
  * @param {ul} list_element html element of list type to push text list items to
  */
-export function setup(list_element) {
+export function attachLogOut(list_element) {
   contentOut = list_element
 }
 
@@ -129,7 +129,7 @@ export function renderLogData(context) {
         if (vIndex == 0) context.stroke();
         else context.fill()
       })
-      context.fillStyle = "rgba(80, 180, 80, 0.2)";
+      context.fillStyle = "rgba(20, 180, 20, 0.2)";
       context.beginPath();
       context.moveTo(data.vertices[0].x, data.vertices[0].y);
       data.vertices.forEach(vertex => context.lineTo(vertex.x, vertex.y))
