@@ -2,4 +2,4 @@
 
 path=/var/www/staging/projects/js-2d-pathing
 mkdir -p $path
-cp ./. $path
+rsync -a --exclude='.*' ./ $path
