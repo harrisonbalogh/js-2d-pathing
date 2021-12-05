@@ -66,8 +66,8 @@ export function newBlocker(vertices, isBoundsBlocker = false) {
     bounds.blocker = blockers[blockers.length - 1]
     bounds.xInset = newPolygon.vertices[0].x
     bounds.yInset = newPolygon.vertices[0].y
-    bounds.width = newPolygon.vertices[1].x - bounds.xInset
-    bounds.height = newPolygon.vertices[2].y - bounds.yInset
+    bounds.width = newPolygon.vertices[3].x - bounds.xInset
+    bounds.height = newPolygon.vertices[1].y - bounds.yInset
   }
 }
 /** Returns removal count */
@@ -369,7 +369,7 @@ function loadFromServer() {
       saveToCookies()
     }
   };
-  xmlhttp.open("GET", "/projects/js-2d-pathing/javascript/Layout2D/layout_default.json", true);
+  xmlhttp.open("GET", "/javascript/Layout2D/layout_default.json", true);
   xmlhttp.send();
 }
 

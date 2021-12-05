@@ -152,29 +152,29 @@ contentOut.onscroll = () => {
   }
 }
 
-const RANDOMIZER_HERTZ = 0.05 * 1000;
+const RANDOMIZER_HERTZ = 0.01 * 1000;
 let mouseRandomizer = {
   clock: null,
   enabled: false,
   lastSideChosen: 0,
   randomizeMousePoint: () => {
-    if (!enabled || Layout.bounds.blocker === undefined) return
+    if (!mouseRandomizer.enabled || Layout.bounds.blocker === undefined) return
 
     let w = Layout.bounds.width, h = Layout.bounds.height, x = Layout.bounds.xInset, y = Layout.bounds.yInset
 
-    lastSideChosen = (lastSideChosen + 1 + Math.floor(Math.random() * 2)) % 4;
+    mouseRandomizer.lastSideChosen = (mouseRandomizer.lastSideChosen + 1 + Math.floor(Math.random() * 2)) % 4;
     mouse.loc = new Point(Math.floor(Math.random() * w), Math.floor(Math.random() * h))
   
-    if (lastSideChosen == 0) mouse.loc.y = x
-    else if (lastSideChosen == 1) mouse.loc.x = w
-    else if (lastSideChosen == 2) mouse.loc.y = h
-    else if (lastSideChosen == 3) mouse.loc.x = y
+    if (mouseRandomizer.lastSideChosen == 0) mouse.loc.y = x + 2
+    else if (mouseRandomizer.lastSideChosen == 1) mouse.loc.x = w
+    else if (mouseRandomizer.lastSideChosen == 2) mouse.loc.y = h
+    else if (mouseRandomizer.lastSideChosen == 3) mouse.loc.x = y + 2
     mouse.lastLeftClick = new Point(mouse.lastRightClick.x, mouse.lastRightClick.y);
     mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
   
     Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
   
-    clock = setTimeout(() => { randomizeMousePoint(); }, RANDOMIZER_HERTZ);
+    mouseRandomizer.clock = setTimeout(() => { mouseRandomizer.randomizeMousePoint(); }, RANDOMIZER_HERTZ);
   }
 }
 
@@ -216,37 +216,36 @@ function renderTestShapes() {
     canvasMasterContext.fillText(mouse.loc.x+', '+mouse.loc.y, mouse.loc.x+5, mouse.loc.y-5);
   }
   if (parallelBarsVisible) {
+    let h = PARALLEL_SETTER_TOP_H; 
     let x = Layout.bounds.xInset + PARALLEL_SETTER_TOP_X;
     let y = Layout.bounds.yInset + PARALLEL_SETTER_TOP_Y;
-    let w = PARALLEL_SETTER_TOP_H; 
-    let h = PARALLEL_SETTER_TOP_H; 
     canvasMasterContext.strokeStyle = "rgb(44,54,64)";
     // Top Setter
     canvasMasterContext.beginPath();
     canvasMasterContext.moveTo(x, y);
-    canvasMasterContext.lineTo(Layout.bounds.width-tSX, tSY);
-    canvasMasterContext.arc(randomizerBoundsWidth-tSX, tSY+tSH/2, tSH/2, -Math.PI/2, Math.PI/2, false);
-    canvasMasterContext.lineTo(tSX, tSY+tSH);
-    canvasMasterContext.arc(tSX, tSY+tSH/2, tSH/2, Math.PI/2, -Math.PI/2, false);
+    canvasMasterContext.lineTo(Layout.bounds.width-x, y);
+    canvasMasterContext.arc(Layout.bounds.width-x, y+h/2, h/2, -Math.PI/2, Math.PI/2, false);
+    canvasMasterContext.lineTo(x, y+h);
+    canvasMasterContext.arc(x, y+h/2, h/2, Math.PI/2, -Math.PI/2, false);
     canvasMasterContext.stroke();
     if (parallelBarDragging.top) {
       canvasMasterContext.fillStyle = "rgb(44,54,64)";
       canvasMasterContext.beginPath();
-      canvasMasterContext.arc(mouse.lastRightClick.x, tSY+tSH/2, tSH/2, 0, Math.PI*2, false);
+      canvasMasterContext.arc(mouse.lastRightClick.x, y+h/2, h/2, 0, Math.PI*2, false);
       canvasMasterContext.fill();
     }
     // Left Setter
     canvasMasterContext.beginPath();
-    canvasMasterContext.moveTo(tSY, tSX);
-    canvasMasterContext.lineTo(tSY, randomizerBoundsWidth-tSX);
-    canvasMasterContext.arc(tSY+tSH/2, randomizerBoundsWidth-tSX, tSH/2, Math.PI, 0, true);
-    canvasMasterContext.lineTo(tSY+tSH, tSX);
-    canvasMasterContext.arc(tSY+tSH/2, tSX, tSH/2, 0, -Math.PI, true);
+    canvasMasterContext.moveTo(y, x);
+    canvasMasterContext.lineTo(y, Layout.bounds.width-x);
+    canvasMasterContext.arc(y+h/2, Layout.bounds.width-x, h/2, Math.PI, 0, true);
+    canvasMasterContext.lineTo(y+h, x);
+    canvasMasterContext.arc(y+h/2, x, h/2, 0, -Math.PI, true);
     canvasMasterContext.stroke();
     if (parallelBarDragging.left) {
       canvasMasterContext.fillStyle = "rgb(44,54,64)";
       canvasMasterContext.beginPath();
-      canvasMasterContext.arc(tSY+tSH/2, mouse.lastRightClick.y, tSH/2, 0, Math.PI*2, false);
+      canvasMasterContext.arc(y+h/2, mouse.lastRightClick.y, h/2, 0, Math.PI*2, false);
       canvasMasterContext.fill();
     }
   }
@@ -308,25 +307,25 @@ const handleKeyDown = keyDownEvent => {
       selectLogNext();
       break;
     case KEY_CODE.SPACEBAR:
-      settingToggle(document.getElementById('setting-item-updateToggle'), toggleCanvasRunning);
+      document.getElementById('setting-item-updateToggle').click();
       break;
     case KEY_CODE.G:
-      settingToggle(document.getElementById('setting-item-gridified'), toggleGridified);
+      document.getElementById('setting-item-gridified').click();
       break;
     case KEY_CODE.E:
-      settingToggle(document.getElementById('setting-item-editMode'), toggleEditMode);
+      document.getElementById('setting-item-editMode').click();
       break;
     case KEY_CODE.M:
-      settingToggle(document.getElementById('setting-item-mouseLabelToggle'), toggleMouseLabel);
+      document.getElementById('setting-item-mouseLabelToggle').click()
       break;
     case KEY_CODE.P:
       printLayout();
       break;
     case KEY_CODE.R:
-      settingToggle(document.getElementById('setting-item-randomizerToggle'), toggleRandomizer);
+      document.getElementById('setting-item-randomizerToggle').click();
       break;
     case KEY_CODE.S:
-      settingToggle(document.getElementById('setting-item-smearToggle'), toggleSmearRendering);
+      document.getElementById('setting-item-smearToggle').click();
       break;
   }
 }
@@ -347,17 +346,19 @@ canvas_bg.onmousedown = e => {
   }
 
   if (parallelBarsVisible) {
+    let x = Layout.bounds.xInset + PARALLEL_SETTER_TOP_X;
+    let y = Layout.bounds.yInset + PARALLEL_SETTER_TOP_Y;
     if (
-      mouse.loc.x > PARALLEL_SETTER_TOP_X && mouse.loc.x < (randomizerBoundsWidth - PARALLEL_SETTER_TOP_X) &&
-      PARALLEL_SETTER_TOP_Y < mouse.loc.y && mouse.loc.y < (PARALLEL_SETTER_TOP_Y + PARALLEL_SETTER_TOP_H)
+      mouse.loc.x > x && mouse.loc.x < (Layout.bounds.width - x) &&
+      y < mouse.loc.y && mouse.loc.y < (y + PARALLEL_SETTER_TOP_H)
     ) {
       parallelBarDragging.top = true;
       parallelBarDragging.left = false;
       return;
     } else
     if (
-      PARALLEL_SETTER_TOP_Y < mouse.loc.x && mouse.loc.x < (PARALLEL_SETTER_TOP_Y + PARALLEL_SETTER_TOP_H) &&
-      mouse.loc.y > PARALLEL_SETTER_TOP_X && mouse.loc.y < (randomizerBoundsWidth - PARALLEL_SETTER_TOP_X)
+      y < mouse.loc.x && mouse.loc.x < (y + PARALLEL_SETTER_TOP_H) &&
+      mouse.loc.y > x && mouse.loc.y < (Layout.bounds.width - x)
     ) {
       parallelBarDragging.left = true;
       parallelBarDragging.top = false;
@@ -405,12 +406,12 @@ canvas_bg.onmousemove = e => {
   if (parallelBarsVisible) disableLogging(parallelBarDragging.top || parallelBarDragging.left)
   if (parallelBarDragging.top || parallelBarDragging.left) {
     if (parallelBarDragging.top) {
-      mouse.lastLeftClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), randomizerBoundsWidth - PARALLEL_SETTER_TOP_X), 0)
-      mouse.lastRightClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), randomizerBoundsWidth - PARALLEL_SETTER_TOP_X), randomizerBoundsWidth)
+      mouse.lastLeftClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X), 0)
+      mouse.lastRightClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X), Layout.bounds.width)
     } else
     if (parallelBarDragging.left) {
-      mouse.lastLeftClick = new Point(0, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), randomizerBoundsWidth - PARALLEL_SETTER_TOP_X))
-      mouse.lastRightClick = new Point(randomizerBoundsWidth, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), randomizerBoundsWidth - PARALLEL_SETTER_TOP_X))
+      mouse.lastLeftClick = new Point(0, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X))
+      mouse.lastRightClick = new Point(Layout.bounds.width, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X))
     }
     disableLogging(true)
     Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
