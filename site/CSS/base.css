@@ -22,32 +22,6 @@ body {
   width: 100%;
 }
 
-/* - - - - - - - - - HEADER - - - - - - - - - */
-
-header {
-  background-color: var(--color-background);
-  height: 22px;
-  overflow-y: visible;
-  position: fixed;
-  width: 100%;
-  text-align: center;
-  z-index: 2;
-}
-.header-label-dev {
-  background-color: var(--color-foreground);
-  border-radius: 0 0 10px 10px;
-  border-style: solid;
-  border-color: var(--color-background);
-  border-width: 0 5px 0 5px;
-  height: 22px;
-  font-size: 13px;
-  font-weight: bold;
-  color: var(--color-background);
-  margin: 0 auto;
-  padding-top: 6px;
-  width: 160px;
-}
-
 /* - - - - - - - - - CONTENT - - - - - - - - - */
 
 .content {
@@ -57,11 +31,11 @@ header {
   display: flex;
   flex-direction: row;
   left: 0;
-  margin: 22px;
+  margin: 8px;
   overflow: hidden;
   padding: 0;
   position: fixed;
   right: 0;
-  top: 22px;
+  top: 0;
 }
 

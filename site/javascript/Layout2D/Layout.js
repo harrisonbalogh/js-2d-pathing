@@ -369,7 +369,7 @@ function loadFromServer() {
       saveToCookies()
     }
   };
-  xmlhttp.open("GET", "/javascript/Layout2D/layout_default.json", true);
+  xmlhttp.open("GET", "/projects/js-2d-pathing/javascript/Layout2D/layout_default.json", true);
   xmlhttp.send();
 }
 
