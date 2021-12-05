@@ -1,7 +1,7 @@
 import './Layout2D/Error.js'
 import { Point } from './Layout2D/Geometry.js'
 import * as Layout from './Layout2D/Layout.js'
-import { renderLogData, disableLogging, selectLogNext, selectLogPrev, attachLogOut} from './log.js'
+import { renderLogData, disableLogging, selectLogNext, selectLogPrev, attachLogOut } from './log.js'
 import log from './log.js'
 
 // ==================================================================================================================== Variables =====

@@ -13,12 +13,13 @@ export class Segment {
     this._distance = undefined
   }
 
+  /// Gets point A if no parameter provided. Sets A if point provided.
   a(point) {
     if (point === undefined) return this._a
     this._distance = undefined
     this._a = point
   }
-
+  /// Gets point B if no parameter provided. Sets B if point provided.
   b(point) {
     if (point === undefined) return this._b
     this._distance = undefined
@@ -84,42 +85,43 @@ export class Segment {
     // Doesn't satisfy any cases:
     return false;
   }
-
+  /// Returns segment as a Vector object.
   vector() {
     return new Vector(this._b.x - this._a.x, this._b.y - this._a.y);
   }
-
+  /// Returns segment as a Line object.
   line() {
     return new Line(this._a, this._b);
   }
-
+  /// Gets angle made by Segment from A to B.
   angle() {
     return Math.atan2(this._b.y - this._a.y, this._b.x - this._a.x);
   }
-
+  /// Replaces point A with point B. And vice versa.
   flip() {
     return new Segment(this._b, this._a);
   }
-
+  /// Checks target point A and B with passed in segment's A and B.
   equals(segment) {
     return (this._a.equals(segment._a) && this._b.equals(segment._b));
   }
-
+  /// Stringified description of segment.
   logString() {
     return this._a.logString() + " -> " + this._b.logString();
   }
-
+  /// The distance before square-rooting. Useful if comparing relative distances rather
+  /// than needing to know the actual distance (more efficient).
   distanceSqrd() {
     if (this._distance !== undefined) return Math.pow(this._distance, 2)
     return this.vector().magnitudeSqrd();
   }
-
+  /// The magnitude of the segment.
   distance() {
     if (this._distance !== undefined) return this._distance
     this._distance = this.vector().magnitude();
     return this._distance
   }
-
+  /// Returns the middle point between A and B as a Point object.
   midpoint() {
     let dX = this._b.x - this._a.x
     let dY = this._b.y - this._a.y
@@ -135,7 +137,7 @@ export class Segment {
   directionTo(point) {
     return this.vector().crossProduct(Vector.fromSegment(this.a(), point)) * -1
   }
-
+  /// Returns the point on the segment which is closest to the given point.
   closestPointOnSegmentTo(point) {
     let aToPoint = new Segment(this._a, point)
     let proj = aToPoint.vector().projection(this.vector())
@@ -144,11 +146,11 @@ export class Segment {
     if (this.distanceSqrd() < proj.magnitudeSqrd()) return this._b
     return this._a.add(proj.asPoint())
   }
-
+  /// Gets the distance between the two points before square-rooting.
   static distanceSqrd(a, b) {
     return new Segment(a, b).distanceSqrd()
   }
-
+  /// Gets the distance between the two points.
   static distance(a, b) {
     return new Segment(a, b).distance()
   }
