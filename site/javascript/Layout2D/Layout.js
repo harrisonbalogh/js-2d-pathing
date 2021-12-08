@@ -73,6 +73,7 @@ export function newBlocker(vertices, isBoundsBlocker = false) {
 /** Returns removal count */
 function deleteBlocker(blockerIndex) {
   needsTriangulation = true
+  if (blockers[blockerIndex] === bounds.blocker) bounds.blocker = undefined
   return blockers.splice(blockerIndex, 1).length;
 }
 
@@ -369,7 +370,7 @@ function loadFromServer() {
       saveToCookies()
     }
   };
-  xmlhttp.open("GET", "/javascript/Layout2D/layout_default.json", true);
+  xmlhttp.open("GET", "/projects/js-2d-pathing/layout_default.json", true);
   xmlhttp.send();
 }
 
