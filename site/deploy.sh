@@ -5,6 +5,6 @@ then
   exit 1
 fi
 
-path=/var/www/staging/projects/js-2d-pathing
+path=/var/www/staging/projects
 mkdir -p $path
-(cd $1; rsync -a --exclude='.*' $1 $path)
+rsync -a --exclude='.*' $1 $path
