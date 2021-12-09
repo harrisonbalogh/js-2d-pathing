@@ -108,7 +108,7 @@ export function addConstructionPoint(p) {
 }
 
 export function finishConstruction(p) {
-  if (constructingVertices.length > 2) newBlocker(constructingVertices)
+  if (constructingVertices.length > 2) newBlocker(constructingVertices, bounds.blocker === undefined)
   else if (constructingVertices.length == 0 && p !== undefined) {
     // Delete blocker if contains right click
     for (let b = 0; b < blockers.length; b++) {
@@ -353,7 +353,7 @@ function loadFromCookies() {
   let cookieData = getCookie('layoutData')
   if (cookieData !== '') {
     let blockers = JSON.parse(cookieData)
-    blockers.forEach(b => newBlocker(b.map(v => new Point(v[0], v[1])), (bounds.blocker === undefined)))
+    blockers.forEach(b => newBlocker(b.map(v => new Point(v[0], v[1])), bounds.blocker === undefined))
     return true
   }
   return false
@@ -365,7 +365,7 @@ function loadFromServer() {
   xmlhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
       let blockers = JSON.parse(this.responseText)
-      blockers.forEach(b => newBlocker(b.map(p => new Point(p[0], p[1])), (bounds.blocker === undefined)))
+      blockers.forEach(b => newBlocker(b.map(p => new Point(p[0], p[1])), bounds.blocker === undefined))
 
       saveToCookies()
     }

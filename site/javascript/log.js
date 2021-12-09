@@ -65,7 +65,7 @@ export default function log(text, data, flush) {
     logData = [] 
   }
   contentOut.appendChild(li);
-  console.log(text)
+  // console.log(text)
 }
 
 const getLogSelectedIndex = () => {

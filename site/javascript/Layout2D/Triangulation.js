@@ -13,6 +13,7 @@ let TRIANGULATION_ANGLE_BOUND = (30) / 180 * Math.PI
  */
 export default function generateTriangulation(boundsBlocker, holePolygons) {
   log('Generating triangulation.', [], true)
+  if (boundsBlocker === undefined) return []
   let vertices = boundsBlocker.vertices().map(vertex => new Point(vertex.x, vertex.y))
 
   // Connect holes to bounds blocker using bridge segments to form one degenerate polygon
