@@ -1,7 +1,19 @@
 # js-2d-pathing
-Delauny Triangulation, gridifying, and A* pathfinding.
+## Delaunay triangulation, gridifying, A* pathfinding, funnel algorithm
 
-TODO:
+Implements all necessary algorithms for 2D pathfinding in JavaScript. No libraries used.
+
+<img width="495" alt="Screen Shot 2021-12-13 at 9 11 42 PM" src="https://user-images.githubusercontent.com/8960690/145920275-63fd9695-74b0-48ec-b2ed-135c798db63c.png">
+
+Rendering is performed with JS Canvas objects. Triangulation algorithm is a variation of
+Delaunay for handling fixed-width pathfinding (in [Triangulation.js](https://github.com/harrisonbalogh/js-2d-pathing/blob/master/site/javascript/Layout2D/Triangulation.js#L14)). Graph is created
+using edge-shared polygons and bounding polygon. Graph path is determined by A*
+implemention (in [Pathfinding.js](https://github.com/harrisonbalogh/js-2d-pathing/blob/master/site/javascript/Layout2D/Pathfinding.js#L12)). Shortest path is determined by
+funnel algorithm implementation (in [Pathfinding.js](https://github.com/harrisonbalogh/js-2d-pathing/blob/master/site/javascript/Layout2D/Pathfinding.js#L113)).
+
+---
+### TODO:
+---
 
 Fill outside of bounding polygon with another fill color without using canvas clip(). Too expensive.
 
@@ -10,9 +22,13 @@ Each hole should then serve as the bounding space for more internal holes - and 
 continue recursively in this fashion to form a tree. When considering pathing, the
 bounding polygon should be any polygon and its holes should function as the blockers.
 
-Decide how to handle overlapping CW and CCW polygons.
+Decide how to handle overlapping CW with CCW polygons.
 
-# How to Start Simple Web Server
+---
+### Local dev
+---
+
+Run following within /site directory:
 
 Python2:
 > python -m SimpleHTTPServer 8000
