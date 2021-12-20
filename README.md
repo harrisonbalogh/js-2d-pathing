@@ -2,7 +2,8 @@
 ## Delaunay triangulation, gridifying, A* pathfinding, funnel algorithm
 
 <iframe width="700" height="394" src="https://www.youtube.com/embed/VC3mHaZeFlc" title="YouTube video player" frameborder="0" allow="clipboard-write; encrypted-media; picture-in-picture" allowfullscreen /> 
-<br><br>
+
+##
 
 Implements all necessary algorithms for 2D pathfinding in JavaScript. No libraries used.
 
