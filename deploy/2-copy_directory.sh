@@ -5,6 +5,6 @@ then
   exit 1
 fi
 
-path=/var/www/staging/projects
+path=$HTTP_DIR/projects/$2
 mkdir -p $path
-rsync -a --exclude='.*' $1 $path
+rsync -a --exclude='.*' . $HTTP_DIR/projects/$2
