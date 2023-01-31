@@ -302,11 +302,11 @@ export function renderTriangulation(context) {
       context.stroke();
     });
   }
-  
+
   pathfindingRoute.forEach(segment => {
     context.strokeStyle = "rgb(50, 50, 50)"
     context.fillStyle = "rgb(100, 100, 100)"
-    
+
     context.beginPath()
     context.arc(segment.a().x, segment.a().y, 2, 0, 2 * Math.PI, false)
     context.stroke()
@@ -370,7 +370,7 @@ function loadFromServer() {
       saveToCookies()
     }
   };
-  xmlhttp.open("GET", "/projects/js-2d-pathing/javascript/Layout2D/layout_default.json", true);
+  xmlhttp.open("GET", "javascript/Layout2D/layout_default.json", true);
   xmlhttp.send();
 }
 
