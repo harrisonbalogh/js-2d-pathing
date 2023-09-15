@@ -1,7 +1,7 @@
 import Blocker from './Blocker.js'
-import { Polygon, Point, Segment } from './Geometry.js';
+import { Polygon, Point, Segment } from '../../node_modules/@harxer/geometry/geometry.js';
 import getRoute from './Pathfinding.js'
-import generateTriangulation from './Triangulation.js'
+import getTriangulatedGraph from './Triangulation.js'
 import { mouse } from '../core.js'
 
 let blockers = [];
@@ -12,6 +12,7 @@ let triangulationTriangles = undefined
 let pathfindingRoute = []
 let routing = undefined
 let IS_BOUNDS_BLOCKER = true
+let defaultJsonLayoutUrl = "/projects/js-2d-pathing/javascript/Layout2D/layout_default.json";
 export let bounds = {
   blocker: undefined,
   width: undefined,
@@ -210,41 +211,41 @@ export function constructionRender(context) {
   }
 }
 
-/**
-   * Checks blocker collisions against a segment, ray, or line the starts from a vertex
-   * on the perimeter of the blocker.
-   * @param Ray ray The ray cast out to collide with any blockers.
-   * @returns undefined if no collision or ray is internal to self. Else returns a hash with
-   * the index of the blocker it collided with, the index of the side of the blocker that
-   * was collided with, and the intersection point.
-   * @example
-   * {
-   *   intersectionPoint: Point,
-   *   blocker: Blocker,
-   *   side: Segment
-   * }
-   */
-export function raycast(ray) {
-  // TODO: Sides that lay along the cast line count shouldn't count as intersect
-  // Check if ray goes inside its own blocker. If so, return undefined
+// /**
+//    * Checks blocker collisions against a segment, ray, or line the starts from a vertex
+//    * on the perimeter of the blocker.
+//    * @param Ray ray The ray cast out to collide with any blockers.
+//    * @returns undefined if no collision or ray is internal to self. Else returns a hash with
+//    * the index of the blocker it collided with, the index of the side of the blocker that
+//    * was collided with, and the intersection point.
+//    * @example
+//    * {
+//    *   intersectionPoint: Point,
+//    *   blocker: Blocker,
+//    *   side: Segment
+//    * }
+//    */
+// export function raycast(ray) {
+//   // TODO: Sides that lay along the cast line count shouldn't count as intersect
+//   // Check if ray goes inside its own blocker. If so, return undefined
 
-  let pierce = {
-    side: undefined,
-    distanceSqrd: undefined,
-    point: undefined
-  };
+//   let pierce = {
+//     side: undefined,
+//     distanceSqrd: undefined,
+//     point: undefined
+//   };
 
-  for (let b = 0; b < blockers.length; b++) {
-    if (blockers[b].polygon === undefined) continue
-    let pierceData = blockers[b].pierce(ray)
-    if (pierceData !== undefined &&
-      (pierce.distanceSqrd === undefined || pierceData.distanceSqrd < pierce.distanceSqrd)) {
-      pierce = pierceData
-    }
-  }
+//   for (let b = 0; b < blockers.length; b++) {
+//     if (blockers[b].polygon === undefined) continue
+//     let pierceData = blockers[b].pierce(ray)
+//     if (pierceData !== undefined &&
+//       (pierce.distanceSqrd === undefined || pierceData.distanceSqrd < pierce.distanceSqrd)) {
+//       pierce = pierceData
+//     }
+//   }
 
-  return pierce
-}
+//   return pierce
+// }
 
 export function route(origin, destination, logged = true) {
   // move origin and destination outside of any blockers
@@ -276,7 +277,7 @@ function getTriangulation() {
       if (holeBlocker == bounds.blocker) return
       holePolygons.push(holeBlocker.polygon)
     })
-    triangulationTriangles = generateTriangulation(bounds.blocker, holePolygons)
+    triangulationTriangles = getTriangulatedGraph(bounds.blocker, holePolygons)
     needsTriangulation = false
     if (routing !== undefined) route(routing.origin, routing.destination)
   }
@@ -302,11 +303,11 @@ export function renderTriangulation(context) {
       context.stroke();
     });
   }
-  
+
   pathfindingRoute.forEach(segment => {
     context.strokeStyle = "rgb(50, 50, 50)"
     context.fillStyle = "rgb(100, 100, 100)"
-    
+
     context.beginPath()
     context.arc(segment.a().x, segment.a().y, 2, 0, 2 * Math.PI, false)
     context.stroke()
@@ -370,7 +371,7 @@ function loadFromServer() {
       saveToCookies()
     }
   };
-  xmlhttp.open("GET", "/projects/js-2d-pathing/javascript/Layout2D/layout_default.json", true);
+  xmlhttp.open("GET", defaultJsonLayoutUrl, true);
   xmlhttp.send();
 }
 

@@ -1,4 +1,4 @@
-import { Segment, Line, Ray, Vector, Polygon, Point } from './Layout2D/Geometry.js'
+import { Segment, Ray, Vector, Polygon, Point } from '../node_modules/@harxer/geometry/geometry.js'
 import Blocker from './Layout2D/Blocker.js'
 
 let logData = []
@@ -14,7 +14,7 @@ export function disableLogging(val) {
 let contentOut = undefined
 /**
  * Setup on-screen log out with a ul element for text output.
- * 
+ *
  * @param {ul} list_element html element of list type to push text list items to
  */
 export function attachLogOut(list_element) {
@@ -62,7 +62,7 @@ export default function log(text, data, flush) {
   if (flush) {
     logSelected = undefined
     contentOut.innerHTML = "";
-    logData = [] 
+    logData = []
   }
   contentOut.appendChild(li);
   // console.log(text)
@@ -85,7 +85,7 @@ export function selectLogPrev() {
 
 export function selectLogNext() {
   let c = getLogSelectedIndex()
-  if (c === undefined || c == contentOut.children.length - 1) return 
+  if (c === undefined || c == contentOut.children.length - 1) return
   contentOut.children[c + 1].dispatchEvent(new Event('mousedown'));
 }
 

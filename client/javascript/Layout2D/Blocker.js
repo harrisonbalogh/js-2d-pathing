@@ -1,5 +1,3 @@
-import {Segment, Line, Ray, Vector, Polygon, Point, extrudeVertices} from './Geometry.js'
-
 /**
  * Provides convenience construction and render methods for polygons. Pathfinding will use the global
  * blockers array to create the world graph layout. Each object will track its original constructing

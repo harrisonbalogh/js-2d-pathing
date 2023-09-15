@@ -1,8 +1,8 @@
-import { Segment, Vector, Polygon, Point } from './Geometry.js'
-import log from '../log.js'
+import { Segment, Vector, Polygon, Point } from '../../node_modules/@harxer/geometry/geometry.js'
 import {optimizeTriangulation as optimize} from './Layout.js'
 import Blocker from './Blocker.js'
 
+/** Controls threshold for graph optimization for conjoining triangles. */
 let TRIANGULATION_ANGLE_BOUND = (30) / 180 * Math.PI
 
 /**
@@ -11,8 +11,8 @@ let TRIANGULATION_ANGLE_BOUND = (30) / 180 * Math.PI
  * @param {[Polygon]} holePolygons Holes to be avoided when triangulating.
  * @returns {[Polygon]} an array of triangles
  */
-export default function generateTriangulation(boundsBlocker, holePolygons) {
-  log('Generating triangulation.', [], true)
+export default function getTriangulatedGraph(boundsBlocker, holePolygons) {
+  // log('Generating triangulation.', [], true)
   if (boundsBlocker === undefined) return []
   let vertices = boundsBlocker.vertices().map(vertex => new Point(vertex.x, vertex.y))
 
@@ -166,6 +166,13 @@ export default function generateTriangulation(boundsBlocker, holePolygons) {
   setNeighbors(triangles)
   return triangles
 }
+
+// ======== INTERNAL Helpers =========
+
+/**
+ * Updates object in `vertices` as index `i` with `angle` between neighboring
+ * vertices and whether or not that angle is `convex`.
+ */
 function setConvexAndAngleFor(vertices, i) {
   let vPrev = vertices[(i - 1) < 0 ? vertices.length - 1 : (i - 1)]
   let v = vertices[i]
@@ -184,6 +191,8 @@ function setConvexAndAngleFor(vertices, i) {
   v.convex = true
   v.angle = getVectorAngle(prevVector, nextVector)
 }
+
+/** Eartip vertices are convex and do not contain any peer vertices inside the triangle formed by its neighbors. */
 function setEartipStatus(vertices, i) {
   let vPrev = vertices[(i - 1) < 0 ? vertices.length - 1 : (i - 1)]
   let v = vertices[i]
@@ -199,7 +208,7 @@ function setEartipStatus(vertices, i) {
   for (let d = 0; d < vertices.length; d++) {
     if (vertices[d].convex) continue
     if (triangle.containsPoint(vertices[d])) {
-      // log(`    Eartip contains point ${vertices[d].logString()}.`, [vertices[d],  new Segment(v, vPrev), new Segment(v, vNext)])
+      // log(`    Eartip contains peer vertex ${vertices[d].logString()}.`, [vertices[d],  new Segment(v, vPrev), new Segment(v, vNext)])
       vertices[i].eartip = false
       return
     }
@@ -207,6 +216,8 @@ function setEartipStatus(vertices, i) {
   // log(`    Eartip with angle ${v.angle * 180 / Math.PI}.`, [new Segment(v, vPrev), new Segment(v, vNext)])
   v.eartip = true
 }
+
+/** Updates overlapping polygon edges to create double links with peers */
 function setNeighbors(triangles) {
   for (let i = 0; i < triangles.length; i++) {
     let polygon = triangles[i]
@@ -229,6 +240,10 @@ function setNeighbors(triangles) {
     }
   }
 }
+
+/** Finds peer edge overlapping this edge (peer would be reversed from target).
+ * @returns {Vector}
+*/
 function getPeerEdge(peers, edge) {
   if (edge.peer !== undefined) return edge.peer
   for (let p = 0; p < peers.length; p++) {
@@ -241,6 +256,10 @@ function getPeerEdge(peers, edge) {
   }
   return undefined
 }
+
+/** Get angle between vectors assuming they connect.
+ * @returns {Number} Angle in radians between vectors
+ */
 function getVectorAngle(prevVector, nextVector) {
   return Math.acos(prevVector.dotProduct(nextVector) / (prevVector.magnitude() * nextVector.magnitude()))
 }

@@ -1,5 +1,5 @@
 import './Layout2D/Error.js'
-import { Point } from './Layout2D/Geometry.js'
+import { Point } from '../node_modules/@harxer/geometry/geometry.js'
 import * as Layout from './Layout2D/Layout.js'
 import { renderLogData, disableLogging, selectLogNext, selectLogPrev, attachLogOut } from './log.js'
 import log from './log.js'
@@ -52,7 +52,7 @@ const SETTING_TOGGLE_ELEMENTS_MAP = {
   'setting-item-printLayout': printLayout
 }
 Object.keys(SETTING_TOGGLE_ELEMENTS_MAP).forEach(elemId => {
-  let elem = document.getElementById(elemId) 
+  let elem = document.getElementById(elemId)
   elem.onclick = () => {
     elem.className = elem.className == "active" ? "" : "active"
     SETTING_TOGGLE_ELEMENTS_MAP[elemId]()
@@ -164,16 +164,16 @@ let mouseRandomizer = {
 
     mouseRandomizer.lastSideChosen = (mouseRandomizer.lastSideChosen + 1 + Math.floor(Math.random() * 2)) % 4;
     mouse.loc = new Point(Math.floor(Math.random() * w), Math.floor(Math.random() * h))
-  
+
     if (mouseRandomizer.lastSideChosen == 0) mouse.loc.y = x + 2
     else if (mouseRandomizer.lastSideChosen == 1) mouse.loc.x = w
     else if (mouseRandomizer.lastSideChosen == 2) mouse.loc.y = h
     else if (mouseRandomizer.lastSideChosen == 3) mouse.loc.x = y + 2
     mouse.lastLeftClick = new Point(mouse.lastRightClick.x, mouse.lastRightClick.y);
     mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
-  
+
     Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
-  
+
     mouseRandomizer.clock = setTimeout(() => { mouseRandomizer.randomizeMousePoint(); }, RANDOMIZER_HERTZ);
   }
 }
@@ -216,7 +216,7 @@ function renderTestShapes() {
     canvasMasterContext.fillText(mouse.loc.x+', '+mouse.loc.y, mouse.loc.x+5, mouse.loc.y-5);
   }
   if (parallelBarsVisible) {
-    let h = PARALLEL_SETTER_TOP_H; 
+    let h = PARALLEL_SETTER_TOP_H;
     let x = Layout.bounds.xInset + PARALLEL_SETTER_TOP_X;
     let y = Layout.bounds.yInset + PARALLEL_SETTER_TOP_Y;
     canvasMasterContext.strokeStyle = "rgb(44,54,64)";
@@ -301,7 +301,7 @@ const handleKeyDown = keyDownEvent => {
   // log(`Log key: ${keyDownEvent.keyCode}`)
   switch(keyDownEvent.keyCode) {
     case KEY_CODE.ARROW_UP:
-      selectLogPrev(); 
+      selectLogPrev();
       break;
     case KEY_CODE.ARROW_DOWN:
       selectLogNext();
