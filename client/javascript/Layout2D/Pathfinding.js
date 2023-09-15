@@ -41,10 +41,8 @@ export default function getRoute(graph, origin, destination) {
       let next = nodes[graph.indexOf(edge.peer.parent)]
       let frontier = edge.closestPointOnSegmentTo(current.frontier)
       let cost = current.cost + Segment.distance(current.frontier, frontier) // TODO: edge cost is always 0
-      if (logged) {
-        // testLine(current.frontier, frontier)
-        // log(`        Frontier ${frontier.logString()} costs ${cost}`, [current.frontier, frontier, edge])
-      }
+      // testLine(current.frontier, frontier)
+      // log(`        Frontier ${frontier.logString()} costs ${cost}`, [current.frontier, frontier, edge])
 
       if (next.cost === undefined || cost < next.cost) {
         next.cost = cost
@@ -65,7 +63,7 @@ export default function getRoute(graph, origin, destination) {
     current = current.from.node
   }
   // log(`Route from ${origin.logString()} to ${destination.logString()}`, route.map(r => r.polygon))
-  return {path: createShortestPath(route.reverse(), origin, destination, logged), route: route};
+  return {path: createShortestPath(route.reverse(), origin, destination), route: route};
 }
 
 // ======== INTERNAL Helpers =========
@@ -77,7 +75,7 @@ export default function getRoute(graph, origin, destination) {
  * @param {Point} finish goal position
  * @returns {[{point: Point, polygon: Polygon}]} shortest line segments through route
  */
-function createPath(route, start, finish, logged) {
+function createPath(route, start, finish) {
   if (route.length == 1) return [start, finish]
   let path = [{point: start, polygon: route[0]}]
   // log(`Starting path from ${start.logString()}`, [start])
@@ -110,7 +108,7 @@ function createPath(route, start, finish, logged) {
  * Implementation described here: The Funnel Algorithm Explained
  * https://medium.com/@reza.teshnizi/the-funnel-algorithm-explained-visually-41e374172d2d
  */
-function createShortestPath(route, start, finish, logged) {
+function createShortestPath(route, start, finish) {
   let tail = [start] // {[Point]}
   let apex = () => tail[tail.length - 1] // latest tail point
   let left = [] // {[Point]}
