@@ -1,0 +1,10 @@
+{
+  "name": "js-2d-pathing",
+  "version": "1.0.0",
+  "description": "JS 2D Pathing client playground.",
+  "author": "Harrison Balogh",
+  "license": "ISC",
+  "devDependencies": {
+    "@harxer/geometry": "^1.1.22"
+  }
+}
