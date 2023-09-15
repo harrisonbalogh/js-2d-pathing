@@ -12,7 +12,7 @@ let triangulationTriangles = undefined
 let pathfindingRoute = []
 let routing = undefined
 let IS_BOUNDS_BLOCKER = true
-let defaultJsonLayoutUrl = "/projects/js-2d-pathing/javascript/Layout2D/layout_default.json";
+let defaultJsonLayoutUrl = "javascript/Layout2D/layout_default.json";
 export let bounds = {
   blocker: undefined,
   width: undefined,
