@@ -2,3 +2,5 @@
 Pather Progress/*
 .DS_Store
 *.pdf
+
+node_modules
