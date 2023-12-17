@@ -1,4 +1,4 @@
-import { Segment, Ray, Vector, Polygon, Point } from '../node_modules/@harxer/geometry/geometry.js'
+import { Segment, Vector, Polygon, Point } from '../node_modules/@harxer/geometry/geometry.js'
 import Blocker from './Layout2D/Blocker.js'
 
 let logData = []
@@ -38,10 +38,7 @@ export default function log(text, data, flush) {
   let li = document.createElement("li");
 
   // Clone data objects
-  data = data.map(d => {
-    let clone = Object.create(d);
-    return Object.assign(clone, d)
-  })
+  data = data.map(d => d.copy);
 
   li.innerHTML = text;
   li.onmouseenter = () => {
@@ -81,19 +78,27 @@ export function selectLogPrev() {
   let c = getLogSelectedIndex()
   if (c === undefined || c == 0) return
   contentOut.children[c - 1].dispatchEvent(new Event('mousedown'));
+  syncContentOutHeight(contentOut.children[c - 1])
 }
 
 export function selectLogNext() {
   let c = getLogSelectedIndex()
   if (c === undefined || c == contentOut.children.length - 1) return
   contentOut.children[c + 1].dispatchEvent(new Event('mousedown'));
+  syncContentOutHeight(contentOut.children[c+1])
+}
+
+function syncContentOutHeight(child) {
+  let y = child.offsetTop - contentOut.offsetTop;
+  if (y - 2 * child.offsetHeight < contentOut.scrollTop) {
+    contentOut.scrollTop = y - 2 * child.offsetHeight;
+  } else if (y + child.offsetHeight > contentOut.scrollTop + contentOut.offsetHeight) {
+    contentOut.scrollTop = y + child.offsetHeight - contentOut.offsetHeight;
+  }
 }
 
 export function renderLogData(context) {
-  logData.forEach(data => {
-    if (data instanceof Ray) {
-      data = new Segment(data.origin, new Point(999999 * Math.cos(data.angle), 999999 * Math.sin(data.angle)))
-    } else
+  logData.forEach((data, i) => {
     if (data instanceof Blocker) {
       data = data.polygon
     } else
@@ -103,23 +108,23 @@ export function renderLogData(context) {
 
     if (data instanceof Segment) {
       context.beginPath()
-      context.arc(data.a().x, data.a().y, 4, 0, 2 * Math.PI, false)
+      context.arc(data.a.x, data.a.y, 4, 0, 2 * Math.PI, false)
       context.stroke()
       context.beginPath()
-      context.arc(data.b().x, data.b().y, 4, 0, 2 * Math.PI, false)
+      context.arc(data.b.x, data.b.y, 4, 0, 2 * Math.PI, false)
       context.fill()
       context.beginPath()
-      context.moveTo(data.a().x, data.a().y)
-      context.lineTo(data.b().x, data.b().y)
+      context.moveTo(data.a.x, data.a.y)
+      context.lineTo(data.b.x, data.b.y)
       context.stroke()
-      context.fillText(data.a().logString(), data.a().x+5, data.a().y - 5)
-      context.fillText(data.b().logString(), data.b().x+5, data.b().y - 5)
+      context.fillText(`${i}: ${data.a.logString()}`, data.a.x+5, data.a.y - 5)
+      context.fillText(data.b.logString(), data.b.x+5, data.b.y - 5)
     } else
     if (data instanceof Point) {
       context.beginPath();
       context.arc(data.x, data.y, 4, 0, 2 * Math.PI, false);
       context.fill();
-      context.fillText(data.logString(), data.x + 5, data.y - 5);
+      context.fillText(`${i}: ${data.logString()}`, data.x + 5, data.y - 5);
     } else
     if (data instanceof Polygon) {
       data.vertices.forEach((vertex, vIndex) => {
@@ -134,7 +139,7 @@ export function renderLogData(context) {
       context.moveTo(data.vertices[0].x, data.vertices[0].y);
       data.vertices.forEach(vertex => context.lineTo(vertex.x, vertex.y))
       context.lineTo(data.vertices[0].x, data.vertices[0].y);
-      if (!data.counterclockwise) context.fill()
+      if (!data.clockwise) context.fill()
       context.stroke();
     }
   })

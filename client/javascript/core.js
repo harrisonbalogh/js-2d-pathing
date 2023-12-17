@@ -302,9 +302,11 @@ const handleKeyDown = keyDownEvent => {
   switch(keyDownEvent.keyCode) {
     case KEY_CODE.ARROW_UP:
       selectLogPrev();
+      keyDownEvent.preventDefault()
       break;
     case KEY_CODE.ARROW_DOWN:
       selectLogNext();
+      keyDownEvent.preventDefault()
       break;
     case KEY_CODE.SPACEBAR:
       document.getElementById('setting-item-updateToggle').click();

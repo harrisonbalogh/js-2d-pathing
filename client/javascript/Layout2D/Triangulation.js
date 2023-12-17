@@ -1,106 +1,172 @@
-import { Segment, Vector, Polygon, Point } from '../../node_modules/@harxer/geometry/geometry.js'
+import { Segment, Vector, Polygon } from '../../node_modules/@harxer/geometry/geometry.js'
 import {optimizeTriangulation as optimize} from './Layout.js'
+import log from '../log.js';
 import Blocker from './Blocker.js'
 
 /** Controls threshold for graph optimization for conjoining triangles. */
 let TRIANGULATION_ANGLE_BOUND = (30) / 180 * Math.PI
 
+const DEBUG = true;
+
 /**
  * Apply Delaunay triangulation to obtain an array of edge-sharing triangles.
- * @param {Blocker} boundsBlocker Blocker containing all holes for triangulation.
+ * @param {Polygon} boundsPolygon Polygon containing all holes for triangulation.
  * @param {[Polygon]} holePolygons Holes to be avoided when triangulating.
  * @returns {[Polygon]} an array of triangles
  */
-export default function getTriangulatedGraph(boundsBlocker, holePolygons) {
-  // log('Generating triangulation.', [], true)
-  if (boundsBlocker === undefined) return []
-  let vertices = boundsBlocker.vertices().map(vertex => new Point(vertex.x, vertex.y))
+export default function getTriangulatedGraph(boundsPolygon, holePolygons) {
+  if (DEBUG) log('Generating triangulation.', holePolygons, true)
+  if (boundsPolygon === undefined) return []
 
-  // Connect holes to bounds blocker using bridge segments to form one degenerate polygon
-  holePolygons.forEach((hole, hIndex) => {
-    let bridgeCandidateEdges = []
+  /** Wrap vertices in object to prevent modifying Point. @returns {[{vertex: {Point}, convex: {bool}, angle: {int}, eartip: {bool}}]} */
+  let graphBuilder = boundsPolygon.vertices.map(vertex => {return { vertex, convex: undefined, angle: undefined, eartip: undefined }})
+  const graphEdges = _ => graphBuilder.map(({vertex}, i) => new Segment(vertex, graphBuilder[(i + 1) % graphBuilder.length].vertex))
 
-    vertices.forEach(vertex => {
-      hole.vertices.forEach(holeVertex => {
-        let bridgeCandidateEdge = new Segment(vertex, holeVertex)
+  /** Update graphBuilder node at provided index i with angle attribute. */
+  const setNodeAngle = (i) => {
+    let node = graphBuilder[i];
 
-        for (let s = 0; s < hole.vertices.length; s++) {
-          if (holeVertex == hole.edges()[s].a() || holeVertex == hole.edges()[s].b()) continue
-          if (hole.edges()[s].intersects(bridgeCandidateEdge)) {
-            return
-          }
-        }
-        for (let v = 0; v < vertices.length; v++) {
-          let edge = new Segment(vertices[v], vertices[(v+1)%vertices.length])
-          if (vertex == edge.a() || vertex == edge.b()) continue
-          if (edge.intersects(bridgeCandidateEdge)) {
-            return
-          }
-        }
-        for (let h = hIndex + 1; h < holePolygons.length; h++) {
-          let otherHoleEdges = holePolygons[h].edges()
-          for (let e = 0; e < otherHoleEdges.length; e++) {
-            let edge = otherHoleEdges[e]
-            if (edge.intersects(bridgeCandidateEdge)) {
-              return
-            }
-          }
-        }
+    let vPrev = graphBuilder[(i - 1) < 0 ? graphBuilder.length - 1 : (i - 1)].vertex;
+    let v = node.vertex;
+    let vNext = graphBuilder[(i + 1) % graphBuilder.length].vertex;
 
-        bridgeCandidateEdges.push(bridgeCandidateEdge)
-      })
-    })
+    let prevVector = new Vector(vPrev.x - v.x, vPrev.y - v.y);
+    let nextVector = new Vector(vNext.x - v.x, vNext.y - v.y);
 
-    if (bridgeCandidateEdges.length == 0) throw "No bridge candidate edges"
+    node.angle = Math.acos(prevVector.dotProduct(nextVector) / (prevVector.magnitude * nextVector.magnitude));
+  }
 
-    let bridgeEdge = undefined
-    // Get shortest valid bridge segment
-    bridgeCandidateEdges.forEach(edge => {
-      if (bridgeEdge == undefined || edge.distance() < bridgeEdge.distance()) {
-        bridgeEdge = edge
+  /** Updates convex and eartip state and angle of node in current graph.
+   * Eartip vertices are convex and do not contain any peer vertices inside
+   * the triangle formed by its neighbors ("reflex" vertices).
+   */
+  const setNodeData = (_, i) => {
+    let node = graphBuilder[i];
+
+    let vPrev = graphBuilder[(i - 1) < 0 ? graphBuilder.length - 1 : (i - 1)].vertex;
+    let v = node.vertex;
+    let vNext = graphBuilder[(i + 1) % graphBuilder.length].vertex;
+
+    let prevVector = new Vector(vPrev.x - v.x, vPrev.y - v.y);
+    let nextVector = new Vector(vNext.x - v.x, vNext.y - v.y);
+
+    let cross = prevVector.crossProduct(nextVector)
+
+    if (cross <= 0 || Number.isNaN(cross)) {
+      node.convex = false;
+      node.eartip = false;
+      if (DEBUG) log(`    Setting node data CROSS:${node.convex}`, [vPrev, v, vNext])
+      return
+    }
+
+    node.convex = true
+    // Get angle between origin-shared vectors
+    node.angle = Math.acos(prevVector.dotProduct(nextVector) / (prevVector.magnitude * nextVector.magnitude));
+
+    let triangle = new Polygon([vNext, v, vPrev]);
+    node.eartip = graphBuilder.every(({vertex, convex}) => convex || vertex.equals(vPrev) || vertex.equals(v) || vertex.equals(vNext) || !triangle.containsPoint(vertex));
+    // TODO verify `convex ||` above
+    if (DEBUG) log(`    Setting node data EAR:${node.eartip}`, [new Segment(vPrev, v), new Segment(v, vNext)])
+  }
+
+  // Connect holes to bounds using "bridge" segments to form one degenerate polygon
+  let holePolygonsRemaining = [...holePolygons];
+  const I_HOLE = 0; // Always pull from start, if no bridge to bounds, hole is pushed to end
+  while (holePolygonsRemaining.length > 0) {
+    let hole = holePolygonsRemaining.splice(I_HOLE, 1)[0];
+
+    // Select shortest "bridge" edge connecting hole to bounding polygon. // TODO might not need to get shortest edge (first may work)
+    let { bridgeEdge, iHoleVertex } = hole.vertices.reduce((shortestBridge, holeVertex, iHoleVertex) => {
+
+      // Find all segments that connect a hole to bounds without intersecting itself or neighbors
+      let {distSqrd, bridgeCandidate} = graphBuilder
+        .map(({vertex: boundsVertex}) => new Segment(boundsVertex, holeVertex))
+        // .forEach(({bridgeCandidate, iBoundsVertex}) => log(`v ${iBoundsVertex}  `, [bridgeCandidate]))
+        .filter(bridgeCandidate =>
+          // if (DEBUG) log(`  - Bridge candidate`, [bridgeCandidate])
+          // Check intersections with this hole's edges - ignoring endpoint overlaps
+          hole.edges.every(holeEdge => holeEdge.a.equals(holeVertex) || holeEdge.b.equals(holeVertex) || !holeEdge.intersects(bridgeCandidate)) &&
+          // Check intersections with bounds edges - ignoring endpoint overlaps
+          graphEdges().every(boundsEdge => boundsEdge.a.equals(bridgeCandidate.a) || boundsEdge.b.equals(bridgeCandidate.a) || !boundsEdge.intersects(bridgeCandidate)) &&
+          // Check intersections with other hole's edges
+          holePolygonsRemaining.every((peerHole, iPeerHole) => iPeerHole <= I_HOLE || peerHole.edges.every(peerHoleEdge => !peerHoleEdge.intersects(bridgeCandidate)))
+        )
+        .reduce((shortestBridgeCandidate, bridgeCandidate) => {
+          let distSqrd = bridgeCandidate.distanceSqrd();
+          if (distSqrd < shortestBridgeCandidate.distSqrd) return { distSqrd, bridgeCandidate };
+          return shortestBridgeCandidate;
+        }, { distSqrd: Infinity })
+
+      if (distSqrd < shortestBridge.distSqrd) return { distSqrd, iHoleVertex, bridgeEdge: bridgeCandidate}
+      return shortestBridge;
+    }, {distSqrd: Infinity});
+
+    if (bridgeEdge === undefined) {
+      if (holePolygonsRemaining.length === 1) {
+        throw 'No bridges for single hole polygon.'
       }
-    })
-    let bridgePolygonIndex = vertices.indexOf(bridgeEdge.a())
-    let bridgeHoleIndex = hole.vertices.indexOf(bridgeEdge.b())
-    let shiftedHoleVertices = hole.vertices.slice(bridgeHoleIndex + 1).concat(hole.vertices.slice(0, bridgeHoleIndex + 1))
+      if (DEBUG) log('  No bridge edges. Pushing to end.')
+      // Push hole to end
+      holePolygonsRemaining.push(hole);
+      if (DEBUG) log('  Remaining new triangulation.', holePolygonsRemaining)
+      continue;
+    };
 
-    vertices.splice(bridgePolygonIndex, 0, ...shiftedHoleVertices)
-    vertices.splice(bridgePolygonIndex, 0, new Point(bridgeEdge.b().x, bridgeEdge.b().y))
-    vertices.splice(bridgePolygonIndex, 0, new Point(bridgeEdge.a().x, bridgeEdge.a().y))
-  })
+    if (DEBUG) log(`Bridge edge generated ${bridgeEdge.logString()} at ${iHoleVertex}`, [bridgeEdge])
 
-  // Gather 'Eartips'. Req's: vertex is convex and triangle formed by prev and next vertex does not contain any reflex vertices
-  vertices.forEach((_, i) => setConvexAndAngleFor(vertices, i))
-  vertices.forEach((_, i) => setEartipStatus(vertices, i))
+    // Insert hole and bridge vertices into composite polygon
+    let shiftedHoleVertices = hole.vertices.slice(iHoleVertex + 1).concat(hole.vertices.slice(0, iHoleVertex + 1))
+    // if (DEBUG) log(`shiftedHoleVertices`, shiftedHoleVertices.concat([new Segment(shiftedHoleVertices[0], shiftedHoleVertices[0].copy.add({x: 0, y: -50}))]))
+    // if (DEBUG) log(`iBoundsVertex ${iBoundsVertex}`, [new Segment(shiftedHoleVertices[0], shiftedHoleVertices[0].copy.add({x: 0, y: -50}))])
+    // Insert bridge and hole into smallest angle vertex for overlapped bridge insertions
+    let boundsVertexEntry = graphBuilder.reduce((smallest, node, iNode) => {
+      // Find overlapping bridge intersections
+      if (!bridgeEdge.a.equals(node.vertex)) return smallest;
+      setNodeAngle(iNode);
+      if (DEBUG) log(`  Vertex angle ${node.angle}`, [node.vertex]);
+      // Select smallest inner angle
+      if (node.angle > smallest.angle) return {angle: node.angle, iNode}
+      return smallest;
+    }, {angle: 0}).iNode;
+    // let boundsVertexEntry = graphBuilder.findLastIndex((({vertex}) => bridgeEdge.a.equals(vertex)))
+    if (DEBUG) log(`Insert here ${boundsVertexEntry}`, [bridgeEdge, ...graphBuilder.map(({vertex}) => vertex)])
+    graphBuilder.splice(boundsVertexEntry, 0, ...[bridgeEdge.a, bridgeEdge.b, ...shiftedHoleVertices].map(vertex => {return { vertex }}))
+    // if (DEBUG) log('graph', graphBuilder.map(({vertex}) => vertex).filter((node, i) => graphBuilder.every(({vertex: other}, iOther) => i <= iOther || !node.equals(other))))
+    // if (DEBUG) graphBuilder.forEach(({vertex}, i) => log(`graph ${i}`, [vertex]))
+  }
 
-  let triangles = []
-  let n = vertices.length
+  if (DEBUG) graphBuilder.forEach(({vertex}, i) => log(`Final graph ${i}`, [vertex]))
+  graphBuilder.forEach(setNodeData);
+
+  let triangles = [];
+  let n = graphBuilder.length;
   while (triangles.length < n - 2) {
-    let lowest = {i: undefined, angle: undefined}
-    for (let i = 1; i < vertices.length; i++) {
-      if (!vertices[i].eartip) continue
-      if (lowest.i === undefined || vertices[i].angle < lowest.angle) {
-        lowest.i = i
-        lowest.angle = vertices[i].angle
-      }
-    }
-    if (lowest.i === undefined) {
-      break
-    }
-    let vPrev = vertices[(lowest.i - 1) < 0 ? vertices.length - 1 : (lowest.i - 1)]
-    let v = vertices[lowest.i]
-    let vNext = vertices[(lowest.i + 1) % vertices.length]
-    if (vPrev === undefined || v === undefined || vNext === undefined) {
-      throw 'Vertex issue in pathing.'
-    }
+
+    // Get smallest graph node by inner angle
+    let {node, iNode} = graphBuilder.reduce((smallestAngleNode, node, iNode) => {
+      if (!node.eartip) return smallestAngleNode;
+      if (node.angle < smallestAngleNode.angle) return {angle: node.angle, node, iNode};
+      return smallestAngleNode;
+    }, {angle: Infinity});
+
+    // No eartip nodes available
+    if (node === undefined) {
+      if (DEBUG) log('No eartips.');
+      break;
+    };
+
+    let vPrev = graphBuilder[(iNode - 1) < 0 ? graphBuilder.length - 1 : (iNode - 1)].vertex;
+    let v = node.vertex;
+    let vNext = graphBuilder[(iNode + 1) % graphBuilder.length].vertex;
+
     // Triangulation degenerate polygon is CCW. Vertices are flipped here to form CW polygon
     let triangle = new Polygon([vNext, v, vPrev])
 
-    if (optimize) {
+    if (false && optimize) {
       let optimizeVertices = [
-        {angle: triangle.interiorAngleVertex(0), oppositeEdge: triangle.edges()[1]},
-        {angle: triangle.interiorAngleVertex(1), oppositeEdge: triangle.edges()[2]},
-        {angle: triangle.interiorAngleVertex(2), oppositeEdge: triangle.edges()[0]}
+        {angle: triangle.interiorAngleVertex(0), oppositeEdge: triangle.edges[1]},
+        {angle: triangle.interiorAngleVertex(1), oppositeEdge: triangle.edges[2]},
+        {angle: triangle.interiorAngleVertex(2), oppositeEdge: triangle.edges[0]}
       ].sort((e1, e2) => e1.angle < e2.angle)
 
       if (optimizeVertices.some(v => v.angle < TRIANGULATION_ANGLE_BOUND)) {
@@ -110,22 +176,22 @@ export default function getTriangulatedGraph(boundsBlocker, holePolygons) {
           let peerPolygon = peerEdge.parent
 
           let quadrilateral = new Polygon([
-            triangle.vertices[triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b())],
-            triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b()) + 1) % triangle.vertices.length],
-            peerPolygon.vertices[peerPolygon.vertices.indexOf(peerEdge.b())],
-            peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b()) + 1) % peerPolygon.vertices.length]
+            triangle.vertices[triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b)],
+            triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b) + 1) % triangle.vertices.length],
+            peerPolygon.vertices[peerPolygon.vertices.indexOf(peerEdge.b)],
+            peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b) + 1) % peerPolygon.vertices.length]
           ])
 
           if (quadrilateral.convex()) {
             let reformPolygon1 = new Polygon([
-              peerPolygon.vertices[peerPolygon.vertices.indexOf(peerEdge.b())],
-              peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b()) + 1) % peerPolygon.vertices.length],
-              triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b()) + 1) % triangle.vertices.length]
+              peerPolygon.vertices[peerPolygon.vertices.indexOf(peerEdge.b)],
+              peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b) + 1) % peerPolygon.vertices.length],
+              triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b) + 1) % triangle.vertices.length]
             ])
             let reformPolygon2 = new Polygon([
-              triangle.vertices[triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b())],
-              triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b()) + 1) % triangle.vertices.length],
-              peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b()) + 1) % peerPolygon.vertices.length]
+              triangle.vertices[triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b)],
+              triangle.vertices[(triangle.vertices.indexOf(optimizeVertex.oppositeEdge.b) + 1) % triangle.vertices.length],
+              peerPolygon.vertices[(peerPolygon.vertices.indexOf(peerEdge.b) + 1) % peerPolygon.vertices.length]
             ])
 
             let smallestOriginalAngle = optimizeVertices[2].angle
@@ -153,93 +219,44 @@ export default function getTriangulatedGraph(boundsBlocker, holePolygons) {
       }
     }
 
-    triangles.push(triangle)
+    if (DEBUG) log(`Processing triangle at ${iNode}`, [triangle])
 
-    vertices.splice(lowest.i, 1)
+    triangles.push(triangle);
+    graphBuilder.splice(iNode, 1);
 
-    setConvexAndAngleFor(vertices, vertices.indexOf(vPrev))
-    setEartipStatus(vertices, vertices.indexOf(vPrev))
-    setConvexAndAngleFor(vertices, vertices.indexOf(vNext))
-    setEartipStatus(vertices, vertices.indexOf(vNext))
+    // update state on prev node
+    setNodeData(undefined, (iNode - 1) < 0 ? graphBuilder.length - 1 : (iNode - 1));
+    // update state on next node which is now just iNode
+    setNodeData(undefined, iNode % graphBuilder.length);
   }
 
-  setNeighbors(triangles)
+  // Link overlapping edges
+  // for (let i = 0; i < triangles.length; i++) {
+  //   let polygon = triangles[i]
+  //   for (let p = 0; p < triangles.length; p++) {
+  //     if (i == p) continue
+  //     let peerPolygon = triangles[p]
+  //     polygon.edges.forEach(edge => {
+  //       if (edge.peer !== undefined) return
+  //       peerPolygon.edges.forEach(peerEdge => {
+  //         if (peerEdge.peer !== undefined) return
+  //         if (edge.equals(peerEdge.flip())) {
+  //           edge.peer = peerEdge
+  //           peerEdge.peer = edge
+  //           // optional: additional preprocessing to store the segment distances
+  //           edge.distance()
+  //           peerEdge.distance()
+  //         }
+  //       })
+  //     })
+  //   }
+  // }
+  if (DEBUG) log(`Created triangles: ${triangles.length}.`, triangles);
   return triangles
 }
 
 // ======== INTERNAL Helpers =========
 
-/**
- * Updates object in `vertices` as index `i` with `angle` between neighboring
- * vertices and whether or not that angle is `convex`.
- */
-function setConvexAndAngleFor(vertices, i) {
-  let vPrev = vertices[(i - 1) < 0 ? vertices.length - 1 : (i - 1)]
-  let v = vertices[i]
-  let vNext = vertices[(i + 1) % vertices.length]
-
-  let prevVector = new Vector(vPrev.x - v.x, vPrev.y - v.y)
-  let nextVector = new Vector(vNext.x - v.x, vNext.y - v.y)
-
-  let cross = prevVector.crossProduct(nextVector)
-
-  if (cross <= 0 || Number.isNaN(cross)) {
-    v.convex = false
-    return
-  }
-
-  v.convex = true
-  v.angle = getVectorAngle(prevVector, nextVector)
-}
-
-/** Eartip vertices are convex and do not contain any peer vertices inside the triangle formed by its neighbors. */
-function setEartipStatus(vertices, i) {
-  let vPrev = vertices[(i - 1) < 0 ? vertices.length - 1 : (i - 1)]
-  let v = vertices[i]
-  let vNext = vertices[(i + 1) % vertices.length]
-
-  if (!v.convex) {
-    // log(`    Eartip is not convex skipping.`, [new Segment(v, vPrev), new Segment(v, vNext)])
-    vertices[i].eartip = false
-    return
-  }
-
-  let triangle = new Polygon([vNext, v, vPrev])
-  for (let d = 0; d < vertices.length; d++) {
-    if (vertices[d].convex) continue
-    if (triangle.containsPoint(vertices[d])) {
-      // log(`    Eartip contains peer vertex ${vertices[d].logString()}.`, [vertices[d],  new Segment(v, vPrev), new Segment(v, vNext)])
-      vertices[i].eartip = false
-      return
-    }
-  }
-  // log(`    Eartip with angle ${v.angle * 180 / Math.PI}.`, [new Segment(v, vPrev), new Segment(v, vNext)])
-  v.eartip = true
-}
-
-/** Updates overlapping polygon edges to create double links with peers */
-function setNeighbors(triangles) {
-  for (let i = 0; i < triangles.length; i++) {
-    let polygon = triangles[i]
-    for (let p = 0; p < triangles.length; p++) {
-      if (i == p) continue
-      let peerPolygon = triangles[p]
-      polygon.edges().forEach(edge => {
-        if (edge.peer !== undefined) return
-        peerPolygon.edges().forEach(peerEdge => {
-          if (peerEdge.peer !== undefined) return
-          if (edge.equals(peerEdge.flip())) {
-            edge.peer = peerEdge
-            peerEdge.peer = edge
-            // optional: additional preprocessing to store the segment distances
-            edge.distance()
-            peerEdge.distance()
-          }
-        })
-      })
-    }
-  }
-}
 
 /** Finds peer edge overlapping this edge (peer would be reversed from target).
  * @returns {Vector}
@@ -249,17 +266,10 @@ function getPeerEdge(peers, edge) {
   for (let p = 0; p < peers.length; p++) {
     let peerPolygon = peers[p]
     if (edge.parent == peerPolygon) continue
-    for (let pE = 0; pE < peerPolygon.edges().length; pE++) {
-      let peerEdge = peerPolygon.edges()[pE]
+    for (let pE = 0; pE < peerPolygon.edges.length; pE++) {
+      let peerEdge = peerPolygon.edges[pE]
       if (edge.equals(peerEdge.flip())) return peerEdge
     }
   }
   return undefined
-}
-
-/** Get angle between vectors assuming they connect.
- * @returns {Number} Angle in radians between vectors
- */
-function getVectorAngle(prevVector, nextVector) {
-  return Math.acos(prevVector.dotProduct(nextVector) / (prevVector.magnitude() * nextVector.magnitude()))
 }

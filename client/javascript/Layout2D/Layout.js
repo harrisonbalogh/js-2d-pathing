@@ -3,6 +3,7 @@ import { Polygon, Point, Segment } from '../../node_modules/@harxer/geometry/geo
 import getRoute from './Pathfinding.js'
 import getTriangulatedGraph from './Triangulation.js'
 import { mouse } from '../core.js'
+import log from '../log.js'
 
 let blockers = [];
 let constructingVertices = []; // Used by editMode
@@ -63,6 +64,7 @@ export function newBlocker(vertices, isBoundsBlocker = false) {
   needsTriangulation = true
   blockers.push(new Blocker(newPolygon, originalVertices));
   if (isBoundsBlocker) {
+    console.log(`Set bounds blocker ${vertices}`)
     // Assumes the first blocker (bounds blocker) is a square. TODO - update
     bounds.blocker = blockers[blockers.length - 1]
     bounds.xInset = newPolygon.vertices[0].x
@@ -277,7 +279,14 @@ function getTriangulation() {
       if (holeBlocker == bounds.blocker) return
       holePolygons.push(holeBlocker.polygon)
     })
-    triangulationTriangles = getTriangulatedGraph(bounds.blocker, holePolygons)
+    console.log(`Bounds blocker ${bounds.blocker.polygon.logString()}. Holes: ${holePolygons.map(p => p.logString()).join(', ')}`)
+    try {
+      triangulationTriangles = getTriangulatedGraph(bounds.blocker.polygon, holePolygons)
+    } catch(e) {
+      console.log(`No bridges ${e}`, e)
+      triangulationTriangles = [];
+    }
+    log(`Triangles`, triangulationTriangles)
     needsTriangulation = false
     if (routing !== undefined) route(routing.origin, routing.destination)
   }
@@ -299,7 +308,7 @@ export function renderTriangulation(context) {
       context.moveTo(polygon.vertices[0].x, polygon.vertices[0].y);
       polygon.vertices.forEach(vertex => context.lineTo(vertex.x, vertex.y))
       context.lineTo(polygon.vertices[0].x, polygon.vertices[0].y);
-      if (!polygon.counterclockwise) context.fill()
+      if (!polygon.clockwise) context.fill()
       context.stroke();
     });
   }
@@ -309,17 +318,17 @@ export function renderTriangulation(context) {
     context.fillStyle = "rgb(100, 100, 100)"
 
     context.beginPath()
-    context.arc(segment.a().x, segment.a().y, 2, 0, 2 * Math.PI, false)
+    context.arc(segment.a.x, segment.a.y, 2, 0, 2 * Math.PI, false)
     context.stroke()
     context.beginPath()
-    context.arc(segment.b().x, segment.b().y, 2, 0, 2 * Math.PI, false)
+    context.arc(segment.b.x, segment.b.y, 2, 0, 2 * Math.PI, false)
     context.fill()
     context.beginPath()
-    context.moveTo(segment.a().x, segment.a().y)
-    context.lineTo(segment.b().x, segment.b().y)
+    context.moveTo(segment.a.x, segment.a.y)
+    context.lineTo(segment.b.x, segment.b.y)
     context.stroke()
-    // context.fillText(segment.a().logString(), segment.a().x+5, segment.a().y - 5)
-    // context.fillText(segment.b().logString(), segment.b().x+5, segment.b().y - 5)
+    // context.fillText(segment.a.logString(), segment.a.x+5, segment.a.y - 5)
+    // context.fillText(segment.b.logString(), segment.b.x+5, segment.b.y - 5)
   })
 }
 

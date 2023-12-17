@@ -36,7 +36,7 @@ export default function getRoute(graph, origin, destination) {
 
     if (current === nodes[iDestination]) break
 
-    current.polygon.edges().forEach(edge => {
+    current.polygon.edges.forEach(edge => {
       if (edge.peer === undefined) return
       let next = nodes[graph.indexOf(edge.peer.parent)]
       let frontier = edge.closestPointOnSegmentTo(current.frontier)
@@ -92,10 +92,10 @@ function createPath(route, start, finish) {
 
     // log(`    Failed ${trace.logString()}`, [frontierRoute.edge, trace])
 
-    let aEndpointDistSqrd = Segment.distanceSqrd(nextPoint, frontierRoute.edge.a())
-    let bEndpointDistSqrd = Segment.distanceSqrd(nextPoint, frontierRoute.edge.b())
+    let aEndpointDistSqrd = Segment.distanceSqrd(nextPoint, frontierRoute.edge.a)
+    let bEndpointDistSqrd = Segment.distanceSqrd(nextPoint, frontierRoute.edge.b)
 
-    frontierPath = aEndpointDistSqrd < bEndpointDistSqrd ? frontierRoute.edge.a() : frontierRoute.edge.b()
+    frontierPath = aEndpointDistSqrd < bEndpointDistSqrd ? frontierRoute.edge.a : frontierRoute.edge.b
     path.push({point: frontierPath, polygon: frontierRoute.polygon})
   }
 
@@ -130,20 +130,20 @@ function createShortestPath(route, start, finish) {
     let lPoint, rPoint;
     // Check crossing-edge endpoint boundary-side
     let logStringL = '', logStringR = '';
-    if (exitSegment.directionTo(edge.a()) > 0) {
-      lPoint = edge.a()
-      rPoint = edge.b()
-      logStringL = `    A is left. ${edge.a().logString()}`
-      logStringR = `    B is right. ${edge.b().logString()}`
+    if (exitSegment.directionTo(edge.a) > 0) {
+      lPoint = edge.a
+      rPoint = edge.b
+      logStringL = `    A is left. ${edge.a.logString()}`
+      logStringR = `    B is right. ${edge.b.logString()}`
     } else {
-      lPoint = edge.b()
-      rPoint = edge.a()
-      logStringL = `    B is left. ${edge.b().logString()}`
-      logStringR = `    A is right. ${edge.a().logString()}`
+      lPoint = edge.b
+      rPoint = edge.a
+      logStringL = `    B is left. ${edge.b.logString()}`
+      logStringR = `    A is right. ${edge.a.logString()}`
     }
 
     // Left boundary checks
-    // log(logStringL, [exitSegment, edge.b()])
+    // log(logStringL, [exitSegment, edge.b])
     if (left.length == 0) {
       if (apex().equals(lPoint)) {
         // log(`     Apex is left point. Skip ${lPoint.logString()}`, [...tail])
@@ -190,7 +190,7 @@ function createShortestPath(route, start, finish) {
               // Tighter boundary (1)
               left = left.slice(0, l) // Remove wider bounds
               left.push(lPoint)
-              // log(`      Tighter bound L. ${lEdge.b().logString()} to ${lPoint.logString()} (left: ${left.length})`, [apex(), ...left])
+              // log(`      Tighter bound L. ${lEdge.b.logString()} to ${lPoint.logString()} (left: ${left.length})`, [apex(), ...left])
             } else {
               left = [lPoint] // Move up left
               continue routeEdges; // Skip the right boundary check
@@ -213,7 +213,7 @@ function createShortestPath(route, start, finish) {
 
 
     // Right boundary checks
-    // log(logStringR, [exitSegment, edge.a()])
+    // log(logStringR, [exitSegment, edge.a])
     if (right.length == 0) {
       if (apex().equals(rPoint)) {
         // log(`     Apex is right point. Skip ${rPoint.logString()}`, [...tail])
@@ -260,7 +260,7 @@ function createShortestPath(route, start, finish) {
               // Tighter boundary (1)
               right = right.slice(0, r) // Remove wider bounds
               right.push(rPoint)
-              // log(`      Tighter bound R. ${rEdge.b().logString()} to ${rPoint.logString()} (right: ${right.length})`, [apex(), ...right])
+              // log(`      Tighter bound R. ${rEdge.b.logString()} to ${rPoint.logString()} (right: ${right.length})`, [apex(), ...right])
             } else {
               right = [rPoint] // Move up right
             }

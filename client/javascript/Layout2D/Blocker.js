@@ -16,14 +16,14 @@ export default class Blocker {
   }
 
   edges() {
-    return this.polygon.edges()
+    return this.polygon.edges
   }
 
   render(context) {
     // Draw originalVertices
     if (this.polygon !== undefined) context.strokeStyle = "Red";
     context.fillStyle = "rgba(200, 50, 50, 0.1)"
-    if (this.polygon !== undefined && this.polygon.counterclockwise) context.strokeStyle = "Blue";
+    if (this.polygon !== undefined && this.polygon.clockwise) context.strokeStyle = "Blue";
     this.originalVertices.forEach(vertices => {
       vertices.forEach((vertex, i) => {
         if (i == 0) {
@@ -34,7 +34,7 @@ export default class Blocker {
         }
       });
       context.lineTo(vertices[0].x, vertices[0].y);
-      if (this.polygon === undefined || !this.polygon.counterclockwise) context.fill();
+      if (this.polygon === undefined || !this.polygon.clockwise) context.fill();
       context.stroke();
     });
   }
