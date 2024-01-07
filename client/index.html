@@ -21,22 +21,40 @@
       <canvas id="bgCanvas"></canvas>
 
       <div id="dev-pane">
-        <ul class="controls-settings">
-          <li id="setting-item-updateToggle" class="active">Update Clock</li>
-          <li id="setting-item-mouseLabelToggle" class="active"><b>M</b>ouse Label</li>
-          <li id="setting-item-smearToggle"><b>S</b>mear</li>
-          <li id="setting-item-randomizerToggle"><b>R</b>andomizer</li>
-          <li id="setting-item-parallelLinesToggle">Parallel Lines</li>
-          <li id="setting-item-editMode"><b>E</b>dit Mode</li>
-            <li class="setting-sub hidden" id="setting-item-editMode-smooth" lastElement>Smooth</li>
-          <li id="setting-item-gridified"><b>G</b>ridified</li>
-            <li class="setting-sub hidden" id="setting-item-gridified-optimize" class="active">Optimize</li>
-            <li class="setting-sub hidden" id="setting-item-gridified-visible" lastElement>Visible</li>
-          <li id="setting-item-defaultLayout">Default Layout</li>
-          <li id="setting-item-printLayout"><b>P</b>rint Layout</li>
+        <ul class="controls-settings" id="dev-pane-controls-settings">
+          <li class="setting-item-toggle active" id="setting-item-updateToggle">Update Clock</li>
+          <li class="setting-item-toggle active" id="setting-item-mouseLabelToggle"><b>M</b>ouse Label</li>
+          <li class="setting-item-toggle" id="setting-item-smearToggle"><b>S</b>mear</li>
+          <li class="control-setting-divider">MESH</li>
+          <li class="settings-item-toolbox">
+            <ul id="settings-item-toolbox-buttons">
+              <li id="settings-item-toolbox-pointer"></li>
+              <li id="settings-item-toolbox-constructor"></li>
+              <li id="settings-item-toolbox-eraser"></li>
+            </ul>
+          </li>
+          <li class="setting-item-button" id="setting-item-mesh-reset">Reset</li>
+          <li class="setting-item-button" id="setting-item-mesh-load">Load</li>
+          <li class="setting-item-button" id="setting-item-mesh-print">Print</li>
+          <li class="control-setting-divider">TRIANGULATE</li>
+          <li class="setting-item-toggle" id="setting-item-triangulate-highlight-edges">Highlight Edges</li>
+          <li class="setting-item-toggle" id="setting-item-triangulate-optimize-pass">Optimization Pass</li>
+          <li class="setting-item-toggle" id="setting-item-randomizerToggle"><b>R</b>andomizer</li>
+          <li class="control-setting-divider">CONSOLE</li>
+          <li class="setting-item-button" id="setting-item-console-clear">Clear</li>
         </ul>
+        <ul class="content-divider" id="dev-pane-content-divider">...</ul>
         <ul class="content-output" id="content-output">
         </ul>
+      </div>
+
+      <div class="modal" id="modal-layout-load">
+        <div>
+          <button class="modal-close" id="modal-layout-load-close">X</button>
+          <p>Serialized Layout JSON:</p>
+          <textarea title="JSON" id="modal-layout-load-input"></textarea >
+          <button id="modal-layout-button-load">Load</button>
+        </div>
       </div>
     </div>
 

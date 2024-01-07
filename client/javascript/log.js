@@ -1,5 +1,5 @@
 import { Segment, Vector, Polygon, Point } from '../node_modules/@harxer/geometry/geometry.js'
-import Blocker from './Layout2D/Blocker.js'
+import Mesh from './Layout2D/Mesh.js'
 
 let logData = []
 let logSelected = undefined
@@ -99,7 +99,7 @@ function syncContentOutHeight(child) {
 
 export function renderLogData(context) {
   logData.forEach((data, i) => {
-    if (data instanceof Blocker) {
+    if (data instanceof Mesh) {
       data = data.polygon
     } else
     if (data instanceof Vector) {
@@ -139,7 +139,7 @@ export function renderLogData(context) {
       context.moveTo(data.vertices[0].x, data.vertices[0].y);
       data.vertices.forEach(vertex => context.lineTo(vertex.x, vertex.y))
       context.lineTo(data.vertices[0].x, data.vertices[0].y);
-      if (!data.clockwise) context.fill()
+      if (data.clockwise) context.fill()
       context.stroke();
     }
   })

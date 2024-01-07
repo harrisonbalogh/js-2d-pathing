@@ -7,6 +7,10 @@ import log from './log.js'
 // ==================================================================================================================== Variables =====
 const RENDER_HERTZ = 1000 / 60 // Render update speed
 const RENDER_SCALING = 2
+const view = {
+  x: 0,
+  y: 0
+}
 
 let canvasRunning = true // when the GUI setting is enabled or not. Override drawing.
 let canvasUpdating = false // if update has yet to resume
@@ -14,18 +18,30 @@ let canvasFlush = true // if drawing frames are cleared or retained
 let canvas_bg = document.getElementById("bgCanvas")
 let canvasMasterContext = canvas_bg.getContext('2d') // The primary canvas particles are drawn on
 
+const MOUSE_TOOL = {
+  POINTER: 0,
+  MESH_CONSTRUCTOR: 1,
+  MESH_ERASER: 2,
+}
+
 export let mouse = {
   loc: new Point(0, 0),
   lastLeftClick: new Point(0, 0),
-  lastRightClick: new Point(0, 0)
+  lastRightClick: new Point(0, 0),
+  tool: MOUSE_TOOL.POINTER,
+  get contextLoc() {
+    return new Point(this.loc.x - view.x, this.loc.y - view.y)
+  }
 }
+// Set default toolbox selection to pointer
+document.getElementById('settings-item-toolbox-pointer').className = 'active';
 let mouseLabelsVisible = true;
 
 let gridify = false;
 
-let editingBlockers = false;
-let editingBlockersSmooth = false;
-let editingBlockersSmoothTracking = false;
+let meshConstructorToolActive = false;
+let meshEraserToolActive = false; // TODO NYI
+let canvasMouseDragging = false;
 
 let parallelBarsVisible = false;
 let parallelBarDragging = {top: false, left: false}
@@ -41,23 +57,47 @@ const SETTING_TOGGLE_ELEMENTS_MAP = {
   'setting-item-updateToggle': toggleCanvasRunning,
   'setting-item-mouseLabelToggle': toggleMouseLabel,
   'setting-item-smearToggle': toggleSmearRendering,
-  'setting-item-randomizerToggle': toggleRandomizer,
-  'setting-item-parallelLinesToggle': toggleParallelLines,
-  'setting-item-editMode': toggleEditMode,
-  'setting-item-editMode-smooth': toggleEditModeSmooth,
-  'setting-item-gridified': toggleGridified,
-  'setting-item-gridified-optimize': toggleOptimizeGrid,
-  'setting-item-gridified-visible': toggleVisibleGridify,
-  'setting-item-defaultLayout': resetLayout,
-  'setting-item-printLayout': printLayout
+  // Triangulate settings
+  'setting-item-triangulate-highlight-edges': toggleTriangulateHighlightEdges,
+  'setting-item-triangulate-optimize-pass': toggleTriangulateOptimizationPass,
+  // 'setting-item-randomizerToggle': toggleRandomizer
 }
-Object.keys(SETTING_TOGGLE_ELEMENTS_MAP).forEach(elemId => {
-  let elem = document.getElementById(elemId)
-  elem.onclick = () => {
-    elem.className = elem.className == "active" ? "" : "active"
-    SETTING_TOGGLE_ELEMENTS_MAP[elemId]()
-  }
+Object.keys(SETTING_TOGGLE_ELEMENTS_MAP).forEach(
+  elemId => document.getElementById(elemId).addEventListener('click', e => {
+    e.target.classList.toggle("active");
+    SETTING_TOGGLE_ELEMENTS_MAP[elemId](e);
+  })
+)
+
+const SETTING_BUTTON_ELEMENTS_MAP = {
+  'setting-item-mesh-reset': resetLayout,
+  'setting-item-mesh-load': loadLayout,
+  'setting-item-mesh-print': printLayout,
+}
+Object.keys(SETTING_BUTTON_ELEMENTS_MAP).forEach(
+  elemId => document.getElementById(elemId).addEventListener('click', e => {
+    SETTING_BUTTON_ELEMENTS_MAP[elemId](e);
+  })
+)
+
+// -------------- Dev pane resizing setup
+let devPaneContentResizing = false;
+document.getElementById('dev-pane-content-divider').onmousedown = e => {
+  devPaneContentResizing = true;
+}
+const ELEMENT_DEV_PANE = document.getElementById('dev-pane');
+const ELEMENT_DEV_PANE_CONTROL_SETTINGS = document.getElementById('dev-pane-controls-settings');
+ELEMENT_DEV_PANE.onmousemove = e => {
+  if (!devPaneContentResizing) return;
+  let scrollY = (e.target.getBoundingClientRect().top + e.offsetY) - ELEMENT_DEV_PANE.offsetTop - 10;
+  // ELEMENT_DEV_PANE_CONTROL_SETTINGS.style.height = `${scrollY / ELEMENT_DEV_PANE.offsetHeight * 100}%`
+  ELEMENT_DEV_PANE_CONTROL_SETTINGS.style.height = `${scrollY}px`
+  e.preventDefault();
+}
+document.addEventListener('mouseup', e => {
+  devPaneContentResizing = false;
 })
+// --------------
 
 function toggleCanvasRunning() {
   canvasRunning = !canvasRunning
@@ -69,58 +109,56 @@ function toggleMouseLabel() {
 function toggleSmearRendering() {
   canvasFlush = !canvasFlush
 }
-function toggleRandomizer() {
-  mouseRandomizer.enabled = !mouseRandomizer.enabled;
-  disableLogging(mouseRandomizer.enabled)
-  clearTimeout(mouseRandomizer.clock);
-  if (mouseRandomizer.enabled) mouseRandomizer.randomizeMousePoint();
-}
-function toggleParallelLines() {
-  parallelBarsVisible = !parallelBarsVisible
-}
-function toggleEditMode() {
-  editingBlockers = !editingBlockers
-  if (!editingBlockers) {
-    Layout.clearConstruction()
-    Layout.saveToCookies()
-  }
-  let smoothClass = 'setting-sub' + (editingBlockersSmooth ? ' active' : '') + (editingBlockers ? '' : ' hidden')
-  document.getElementById('setting-item-editMode-smooth').className = smoothClass
-}
-function toggleEditModeSmooth() {
-  editingBlockersSmooth = !editingBlockersSmooth
-  let smoothClass = 'setting-sub' + (editingBlockersSmooth ? ' active' : '') + (editingBlockers ? '' : ' hidden')
-  document.getElementById('setting-item-editMode-smooth').className = smoothClass
-}
-function toggleGridified() {
-  gridify = !gridify;
-
-  let optimizeClass = 'setting-sub' + (Layout.optimizeTriangulation ? ' active' : '') + (gridify ? '' : ' hidden')
-  document.getElementById('setting-item-gridified-optimize').className = optimizeClass
-
-  let visibleClass = 'setting-sub' + (Layout.visibleTriangulation ? ' active' : '') + (gridify ? '' : ' hidden')
-  document.getElementById('setting-item-gridified-visible').className = visibleClass
-}
-function toggleOptimizeGrid() {
+// function toggleRandomizer() {
+//   mouseRandomizer.enabled = !mouseRandomizer.enabled;
+//   disableLogging(mouseRandomizer.enabled)
+//   clearTimeout(mouseRandomizer.clock);
+//   if (mouseRandomizer.enabled) mouseRandomizer.randomizeMousePoint();
+// }
+function toggleTriangulateOptimizationPass(e) {
   Layout.triangulationOptimized(!Layout.optimizeTriangulation)
-
-  let optimizeClass = 'setting-sub' + (Layout.optimizeTriangulation ? ' active' : '') + (gridify ? '' : ' hidden')
-  document.getElementById('setting-item-gridified-optimize').className = optimizeClass
 }
-function toggleVisibleGridify() {
-  Layout.triangulationVisible(!Layout.visibleTriangulation)
 
-  let visibleClass = 'setting-sub' + (Layout.visibleTriangulation ? ' active' : '') + (gridify ? '' : ' hidden')
-  document.getElementById('setting-item-gridified-visible').className = visibleClass
+function toggleTriangulateHighlightEdges(e) {
+  Layout.triangulationVisible(!Layout.visibleTriangulation)
 }
 function resetLayout() {
   Layout.reset()
-  document.getElementById('setting-item-defaultLayout').className = ''
+}
+document.getElementById('modal-layout-load-close').addEventListener('click', _ => {
+  document.getElementById('modal-layout-load').style.display = 'none';
+})
+document.getElementById('modal-layout-button-load').addEventListener('click', _ => {
+  let inputElement = document.getElementById('modal-layout-load-input');
+  Layout.parseLayout(inputElement.value)
+  inputElement.value = '';
+  document.getElementById('modal-layout-load').style.display = 'none';
+})
+function loadLayout() {
+  document.getElementById('modal-layout-load').style.display = 'block';
 }
 function printLayout() {
   log(Layout.serialized())
-  document.getElementById('setting-item-printLayout').className = ''
 }
+
+function handleToolboxClick(e) {
+  for (const child of document.getElementById('settings-item-toolbox-buttons').children) {
+    child.className = ""
+  }
+  e.target.className = "active";
+  if (e.target.id === 'settings-item-toolbox-pointer') {
+    mouse.tool = MOUSE_TOOL.POINTER;
+  } else
+  if (e.target.id === 'settings-item-toolbox-constructor') {
+    mouse.tool = MOUSE_TOOL.MESH_CONSTRUCTOR;
+  } else
+  if (e.target.id === 'settings-item-toolbox-eraser') {
+    mouse.tool = MOUSE_TOOL.MESH_ERASER;
+  }
+}
+document.getElementById('settings-item-toolbox-pointer').addEventListener('click', handleToolboxClick)
+document.getElementById('settings-item-toolbox-constructor').addEventListener('click', handleToolboxClick)
+document.getElementById('settings-item-toolbox-eraser').addEventListener('click', handleToolboxClick)
 
 // =================================================================================================================== Test rendering =====
 let test_points = [];
@@ -152,31 +190,31 @@ contentOut.onscroll = () => {
   }
 }
 
-const RANDOMIZER_HERTZ = 0.01 * 1000;
-let mouseRandomizer = {
-  clock: null,
-  enabled: false,
-  lastSideChosen: 0,
-  randomizeMousePoint: () => {
-    if (!mouseRandomizer.enabled || Layout.bounds.blocker === undefined) return
+// const RANDOMIZER_HERTZ = 0.01 * 1000;
+// let mouseRandomizer = {
+//   clock: null,
+//   enabled: false,
+//   lastSideChosen: 0,
+//   randomizeMousePoint: () => {
+//     if (!mouseRandomizer.enabled || Layout.bounds.blocker === undefined) return
 
-    let w = Layout.bounds.width, h = Layout.bounds.height, x = Layout.bounds.xInset, y = Layout.bounds.yInset
+//     let w = Layout.bounds.width, h = Layout.bounds.height, x = Layout.bounds.xInset, y = Layout.bounds.yInset
 
-    mouseRandomizer.lastSideChosen = (mouseRandomizer.lastSideChosen + 1 + Math.floor(Math.random() * 2)) % 4;
-    mouse.loc = new Point(Math.floor(Math.random() * w), Math.floor(Math.random() * h))
+//     mouseRandomizer.lastSideChosen = (mouseRandomizer.lastSideChosen + 1 + Math.floor(Math.random() * 2)) % 4;
+//     mouse.loc = new Point(Math.floor(Math.random() * w), Math.floor(Math.random() * h))
 
-    if (mouseRandomizer.lastSideChosen == 0) mouse.loc.y = x + 2
-    else if (mouseRandomizer.lastSideChosen == 1) mouse.loc.x = w
-    else if (mouseRandomizer.lastSideChosen == 2) mouse.loc.y = h
-    else if (mouseRandomizer.lastSideChosen == 3) mouse.loc.x = y + 2
-    mouse.lastLeftClick = new Point(mouse.lastRightClick.x, mouse.lastRightClick.y);
-    mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
+//     if (mouseRandomizer.lastSideChosen == 0) mouse.loc.y = x + 2
+//     else if (mouseRandomizer.lastSideChosen == 1) mouse.loc.x = w
+//     else if (mouseRandomizer.lastSideChosen == 2) mouse.loc.y = h
+//     else if (mouseRandomizer.lastSideChosen == 3) mouse.loc.x = y + 2
+//     mouse.lastLeftClick = new Point(mouse.lastRightClick.x, mouse.lastRightClick.y);
+//     mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
 
-    Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
+//     Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
 
-    mouseRandomizer.clock = setTimeout(() => { mouseRandomizer.randomizeMousePoint(); }, RANDOMIZER_HERTZ);
-  }
-}
+//     mouseRandomizer.clock = setTimeout(() => { mouseRandomizer.randomizeMousePoint(); }, RANDOMIZER_HERTZ);
+//   }
+// }
 
 function testLine(a, b, flush = false) {
   if (flush) test_lines = []
@@ -213,7 +251,18 @@ function renderTestShapes() {
   if (mouseLabelsVisible) {
     canvasMasterContext.fillStyle = "black"
     canvasMasterContext.font = '20px sans-serif';
-    canvasMasterContext.fillText(mouse.loc.x+', '+mouse.loc.y, mouse.loc.x+5, mouse.loc.y-5);
+    canvasMasterContext.fillText(mouse.contextLoc.x+', '+mouse.contextLoc.y, mouse.contextLoc.x+5, mouse.contextLoc.y-5);
+  }
+  if (mouse.tool === MOUSE_TOOL.MESH_CONSTRUCTOR) {
+    canvasMasterContext.strokeStyle = "black"
+    canvasMasterContext.lineWidth = 3;
+    canvasMasterContext.beginPath();
+    canvasMasterContext.moveTo(mouse.contextLoc.x - 20, mouse.contextLoc.y);
+    canvasMasterContext.lineTo(mouse.contextLoc.x + 20, mouse.contextLoc.y);
+    canvasMasterContext.moveTo(mouse.contextLoc.x, mouse.contextLoc.y - 20);
+    canvasMasterContext.lineTo(mouse.contextLoc.x, mouse.contextLoc.y + 20);
+    canvasMasterContext.stroke();
+    canvasMasterContext.lineWidth = 1;
   }
   if (parallelBarsVisible) {
     let h = PARALLEL_SETTER_TOP_H;
@@ -270,12 +319,11 @@ window.requestAnimFrame =
 function update(delta) {
   canvasUpdating = true
   if (canvasFlush) {
-    canvasMasterContext.clearRect(0, 0, canvas_bg.width, canvas_bg.height)
-    Layout.renderBlockers(canvasMasterContext)
+    canvasMasterContext.clearRect(-view.x, -view.y, canvas_bg.width, canvas_bg.height)
   }
 
-  if (editingBlockers) Layout.constructionRender(canvasMasterContext)
-  if (gridify && !editingBlockers) Layout.renderTriangulation(canvasMasterContext)
+  Layout.constructionRender(canvasMasterContext)
+  Layout.renderTriangulation(canvasMasterContext)
   if (contentOutScrolling) contentOut.scrollTop += CONTENT_OUT_SCROLL_SPEED
 
   renderTestShapes()
@@ -287,14 +335,17 @@ function update(delta) {
 // ======================================================================================================================= Window Setup =====
 const KEY_CODE = {
   ARROW_UP: 38,
+  ARROW_RIGHT: 39,
   ARROW_DOWN: 40,
+  ARROW_LEFT: 37,
   SPACEBAR: 32,
   G: 71,
   E: 69,
   M: 77,
   P: 80,
   R: 82,
-  S: 83
+  S: 83,
+  V: 86
 }
 const handleKeyDown = keyDownEvent => {
   keyDownEvent = keyDownEvent || window.event;
@@ -311,91 +362,79 @@ const handleKeyDown = keyDownEvent => {
     case KEY_CODE.SPACEBAR:
       document.getElementById('setting-item-updateToggle').click();
       break;
-    case KEY_CODE.G:
-      document.getElementById('setting-item-gridified').click();
-      break;
-    case KEY_CODE.E:
-      document.getElementById('setting-item-editMode').click();
-      break;
-    case KEY_CODE.M:
-      document.getElementById('setting-item-mouseLabelToggle').click()
-      break;
-    case KEY_CODE.P:
-      printLayout();
-      break;
-    case KEY_CODE.R:
-      document.getElementById('setting-item-randomizerToggle').click();
-      break;
-    case KEY_CODE.S:
-      document.getElementById('setting-item-smearToggle').click();
+    case KEY_CODE.V:
+      let childElements = Array.from(document.getElementById('settings-item-toolbox-buttons').children);
+      let iActive = childElements.findIndex(child => child.classList.contains('active'))
+      iActive = (iActive + 1) % childElements.length;
+      childElements[iActive].click();
       break;
   }
 }
 document.addEventListener('keydown', handleKeyDown)
 
 canvas_bg.onmousedown = e => {
-  if (editingBlockers) {
-    if (e.button === 0) {  // Left click add vertex unless smooth constructing
-      if (!editingBlockersSmooth) {
-        Layout.addConstructionPoint(mouse.loc);
+  if (mouse.tool === MOUSE_TOOL.MESH_CONSTRUCTOR) {
+    if (e.button === 0) {  // Left click add vertex or finish mesh if closed shape
+      Layout.addConstructionPoint(mouse.contextLoc);
+    } else { // Right click take back last constructor vertex or erase if no construction in progress
+      if (Layout.hasConstructorVertices()) {
+        Layout.undoConstructionPoint();
       } else {
-        editingBlockersSmoothTracking = true
+        Layout.deleteMeshUnderPoint(mouse.contextLoc);
       }
-    } else { // Right click finish vertex
-      Layout.finishConstruction(mouse.loc);
     }
-    return
-  }
+  } else if (mouse.tool === MOUSE_TOOL.MESH_ERASER) {
+    Layout.deleteMeshUnderPoint(mouse.contextLoc);
+  } else if (mouse.tool === MOUSE_TOOL.POINTER) {
+    // if (parallelBarsVisible) {
+    //   let x = Layout.bounds.xInset + PARALLEL_SETTER_TOP_X;
+    //   let y = Layout.bounds.yInset + PARALLEL_SETTER_TOP_Y;
+    //   if (
+    //     mouse.contextLoc.x > x && mouse.contextLoc.x < (Layout.bounds.width - x) &&
+    //     y < mouse.contextLoc.y && mouse.contextLoc.y < (y + PARALLEL_SETTER_TOP_H)
+    //   ) {
+    //     parallelBarDragging.top = true;
+    //     parallelBarDragging.left = false;
+    //     return;
+    //   } else
+    //   if (
+    //     y < mouse.contextLoc.x && mouse.contextLoc.x < (y + PARALLEL_SETTER_TOP_H) &&
+    //     mouse.contextLoc.y > x && mouse.contextLoc.y < (Layout.bounds.width - x)
+    //   ) {
+    //     parallelBarDragging.left = true;
+    //     parallelBarDragging.top = false;
+    //     return;
+    //   } else {
+    //     parallelBarDragging.top = false;
+    //     parallelBarDragging.left = false;
+    //   }
+    // }
 
-  if (parallelBarsVisible) {
-    let x = Layout.bounds.xInset + PARALLEL_SETTER_TOP_X;
-    let y = Layout.bounds.yInset + PARALLEL_SETTER_TOP_Y;
-    if (
-      mouse.loc.x > x && mouse.loc.x < (Layout.bounds.width - x) &&
-      y < mouse.loc.y && mouse.loc.y < (y + PARALLEL_SETTER_TOP_H)
-    ) {
-      parallelBarDragging.top = true;
-      parallelBarDragging.left = false;
-      return;
-    } else
-    if (
-      y < mouse.loc.x && mouse.loc.x < (y + PARALLEL_SETTER_TOP_H) &&
-      mouse.loc.y > x && mouse.loc.y < (Layout.bounds.width - x)
-    ) {
-      parallelBarDragging.left = true;
-      parallelBarDragging.top = false;
-      return;
-    } else {
-      parallelBarDragging.top = false;
-      parallelBarDragging.left = false;
+    if (e.button === 0) { // Left click
+      mouse.lastLeftClick = new Point(mouse.loc.x, mouse.loc.y)
+
+      //TODO: temp test
+      Layout.contextSelection(mouse.contextLoc);
+    } else { // Right click
+      mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
+
+      canvasMouseDragging = true;
+    }
+
+    if (!meshConstructorToolActive && gridify) {
+      test_lines = []
+      test_circles = []
+      test_points = []
+
+      Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
+
+      // testLine(mouse.lastLeftClick, mouse.lastRightClick)
+      testCircle(mouse.lastLeftClick.x, mouse.lastLeftClick.y, 6)
+      testCircle(mouse.lastRightClick.x, mouse.lastRightClick.y, 6)
     }
   }
 
-  if (e.button === 0) { // Left click
-    mouse.lastLeftClick = new Point(mouse.loc.x, mouse.loc.y)
-  } else { // Right click
-    mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
-  }
-
-  if (!editingBlockers && gridify) {
-    test_lines = []
-    test_circles = []
-    test_points = []
-
-    Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
-
-    // testLine(mouse.lastLeftClick, mouse.lastRightClick)
-    testCircle(mouse.lastLeftClick.x, mouse.lastLeftClick.y, 6)
-    testCircle(mouse.lastRightClick.x, mouse.lastRightClick.y, 6)
-  }
-}
-
-canvas_bg.onmouseup = e => {
-  parallelBarDragging = {top: false, left: false}
-  if (editingBlockersSmoothTracking && editingBlockers && editingBlockersSmooth) {
-    Layout.finishConstruction(mouse.loc);
-  }
-  editingBlockersSmoothTracking = false
+  e.preventDefault();
 }
 
 canvas_bg.onmousemove = e => {
@@ -404,48 +443,57 @@ canvas_bg.onmousemove = e => {
   let rect = canvas_bg.getBoundingClientRect();
   mouse.loc = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top))
 
-  // Parallel bar dragging
-  if (parallelBarsVisible) disableLogging(parallelBarDragging.top || parallelBarDragging.left)
-  if (parallelBarDragging.top || parallelBarDragging.left) {
-    if (parallelBarDragging.top) {
-      mouse.lastLeftClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X), 0)
-      mouse.lastRightClick = new Point(Math.min(Math.max(mouse.loc.x, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X), Layout.bounds.width)
-    } else
-    if (parallelBarDragging.left) {
-      mouse.lastLeftClick = new Point(0, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X))
-      mouse.lastRightClick = new Point(Layout.bounds.width, Math.min(Math.max(mouse.loc.y, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X))
-    }
-    disableLogging(true)
-    Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
-    disableLogging(false)
-  } else if (!editingBlockers) {
-    // Drag pathing
-    if (e.buttons === 1 || e.buttons == 2) {
-      if (e.buttons === 1) {
-        mouse.lastLeftClick = new Point(mouse.loc.x, mouse.loc.y)
-      } else if (e.buttons == 2) {
-        mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
-      }
+  // // Parallel bar dragging
+  // if (parallelBarsVisible) disableLogging(parallelBarDragging.top || parallelBarDragging.left)
+  // if (parallelBarDragging.top || parallelBarDragging.left) {
+  //   if (parallelBarDragging.top) {
+  //     mouse.lastLeftClick = new Point(Math.min(Math.max(mouse.contextLoc.x, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X), 0)
+  //     mouse.lastRightClick = new Point(Math.min(Math.max(mouse.contextLoc.x, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X), Layout.bounds.width)
+  //   } else
+  //   if (parallelBarDragging.left) {
+  //     mouse.lastLeftClick = new Point(0, Math.min(Math.max(mouse.contextLoc.y, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X))
+  //     mouse.lastRightClick = new Point(Layout.bounds.width, Math.min(Math.max(mouse.contextLoc.y, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X))
+  //   }
+  //   disableLogging(true)
+  //   Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
+  //   disableLogging(false)
+  // } else if (!meshConstructorToolActive) {
+  //   // Drag pathing
+  //   if (e.buttons === 1 || e.buttons == 2) {
+  //     if (e.buttons === 1) {
+  //       mouse.lastLeftClick = new Point(mouse.contextLoc.x, mouse.contextLoc.y)
+  //     } else if (e.buttons == 2) {
+  //       mouse.lastRightClick = new Point(mouse.contextLoc.x, mouse.contextLoc.y)
+  //     }
 
-      if (!editingBlockers && gridify) {
-        test_lines = []
-        test_circles = []
-        test_points = []
+  //     if (!meshConstructorToolActive && gridify) {
+  //       test_lines = []
+  //       test_circles = []
+  //       test_points = []
 
-        disableLogging(true)
-        Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
-        disableLogging(false)
+  //       disableLogging(true)
+  //       Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
+  //       disableLogging(false)
 
-        // testLine(mouse.lastLeftClick, mouse.lastRightClick)
-        testCircle(mouse.lastLeftClick.x, mouse.lastLeftClick.y, 6)
-        testCircle(mouse.lastRightClick.x, mouse.lastRightClick.y, 6)
-      }
-    }
-  } else if (editingBlockers && editingBlockersSmooth) {
-    if (editingBlockersSmoothTracking) {
-      Layout.addConstructionPoint(new Point(mouse.loc.x, mouse.loc.y));
-    }
+  //       // testLine(mouse.lastLeftClick, mouse.lastRightClick)
+  //       testCircle(mouse.lastLeftClick.x, mouse.lastLeftClick.y, 6)
+  //       testCircle(mouse.lastRightClick.x, mouse.lastRightClick.y, 6)
+  //     }
+  //   }
+  // }
+
+  if (canvasMouseDragging) {
+    let x = mouse.loc.x - mouse.lastRightClick.x;
+    let y = mouse.loc.y - mouse.lastRightClick.y;
+    mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
+    canvasMasterContext.translate(x, y)
+    view.x += x
+    view.y += y
   }
+}
+
+canvas_bg.onmouseup = e => {
+  canvasMouseDragging = false;
 }
 
 canvas_bg.oncontextmenu = e => e.preventDefault()
@@ -453,8 +501,16 @@ canvas_bg.oncontextmenu = e => e.preventDefault()
 window.onresize = () => homeRefit()
 
 function homeRefit() {
+  // Each time the height or width of a canvas is set,
+  // the canvas transforms will be cleared.
+  let transform = canvasMasterContext.getTransform()
+
+  // Sync canvas size
   canvas_bg.width = canvas_bg.offsetWidth * RENDER_SCALING;
   canvas_bg.height = canvas_bg.offsetHeight * RENDER_SCALING;
+
+  // Apply preserved context transformations
+  canvasMasterContext.setTransform(transform)
 }
 
 // ======================================================================================================================= Launch =====

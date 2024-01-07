@@ -1,94 +1,105 @@
-import Blocker from './Blocker.js'
+import Mesh from './Mesh.js'
 import { Polygon, Point, Segment } from '../../node_modules/@harxer/geometry/geometry.js';
 import getRoute from './Pathfinding.js'
 import getTriangulatedGraph from './Triangulation.js'
 import { mouse } from '../core.js'
 import log from '../log.js'
 
-let blockers = [];
-let constructingVertices = []; // Used by editMode
-let constructingCcw = false
-let needsTriangulation = true
-let triangulationTriangles = undefined
+
+let constructingVertices = [];
+export const hasConstructorVertices = _ => constructingVertices.length > 0;
+let _constructingCcw = false;
 let pathfindingRoute = []
 let routing = undefined
-let IS_BOUNDS_BLOCKER = true
 let defaultJsonLayoutUrl = "javascript/Layout2D/layout_default.json";
 export let bounds = {
-  blocker: undefined,
   width: undefined,
   height: undefined,
   xInset: undefined,
   yInset: undefined
 }
 
-export let optimizeTriangulation = true
+/**
+ * This defines the current triangulation space. If the scene is empty, this
+ * will be undefined. The first mesh to be added is the highest level mesh context.
+ * The holes of this mesh can then be selected as the current context - down the
+ * cascading tree of hole meshes.
+ * @type {Mesh}
+ */
+let meshContext = undefined;
+/**
+ * Root-most mesh object present in scene. This object can be traversed for all other
+ * meshes present in the scene through the Mesh `holes` property.
+ * @type {Mesh}
+ */
+let rootMesh = undefined;
+let layoutPolygons = [];
+
+export let optimizeTriangulation = false
 export function triangulationOptimized(val) {
   if (val != optimizeTriangulation) {
-    needsTriangulation = true
+    if (meshContext) meshContext.needsTriangulation();
     optimizeTriangulation = val
   }
 }
 
 export let visibleTriangulation = false
 export function triangulationVisible(val) {
-  if (val != visibleTriangulation) {
-    visibleTriangulation = val
-  }
+  visibleTriangulation = val
 }
 
-/// TODO: Test if any edges overlap here in blocker creation. This means the blocker is invalid
-/**
- * Provides convenience construction and render methods for polygons. Pathfinding will use the global
- * blockers array to create the world graph layout. Each object will track its original constructing
- * vertices but its final polygon may be altered in the case of unions or holes.
- * @param vertices - Array of points that make up a blocker. CW fills internally. CCW fills externally.
- * @param originalVertices - Array of vertices that formed this blocker's polygon before union.
- * @param holes - Array of polygons. Primarly used for drawing inaccessible areas. NYI.
- */
-export function newBlocker(vertices, isBoundsBlocker = false) {
-  // Dep: Extrude blocker to keep pathers from getting too close to blocker
-  // vertices = extrudeVertices(vertices, 10)
-  let originalVertices = [vertices]
-  let newPolygon = new Polygon(vertices)
+/** Returns latest mesh addition. */
+function insertMeshContextHole(vertices) {
+  let polygon = new Polygon(vertices);
 
-  // Union overlapping blockers
-  for (let b = 0; b < blockers.length; b++) {
-    if (newPolygon.overlaps(blockers[b].polygon)) {
-      newPolygon = newPolygon.union(blockers[b].polygon)
-      originalVertices = originalVertices.concat(blockers[b].originalVertices)
-      b -= deleteBlocker(b)
+  // If scene is empty, need to define mesh root.
+  if (meshContext === undefined) {
+    if (polygon.counterclockwise) {
+      console.error('Root boundary must be CCW.')
+      return; // Root must be CCW
+    }
+    rootMesh = new Mesh(polygon);
+    meshContext = rootMesh;
+    layoutPolygons = [polygon];
+    log(`Creating root boundary.`, [polygon])
+    return meshContext;
+  }
+
+  meshContext.needsTriangulation();
+  log(`Adding polygon.`, [polygon])
+  layoutPolygons.push(polygon);
+  return meshContext.applyHole(polygon);
+}
+
+export function contextSelection(p) {
+  if (meshContext === undefined) return;
+  let holeSelected = meshContext.holes.find(hole => !hole.bounds.containsPoint(p));
+
+  if (holeSelected) {
+    meshContext = holeSelected;
+    log(`Selected hole`, [meshContext.bounds])
+  } else {
+    if (meshContext.bounds.containsPoint(p)) {
+      if (meshContext.parent !== undefined) {
+        meshContext = meshContext.parent;
+      }
     }
   }
-
-  needsTriangulation = true
-  blockers.push(new Blocker(newPolygon, originalVertices));
-  if (isBoundsBlocker) {
-    console.log(`Set bounds blocker ${vertices}`)
-    // Assumes the first blocker (bounds blocker) is a square. TODO - update
-    bounds.blocker = blockers[blockers.length - 1]
-    bounds.xInset = newPolygon.vertices[0].x
-    bounds.yInset = newPolygon.vertices[0].y
-    bounds.width = newPolygon.vertices[3].x - bounds.xInset
-    bounds.height = newPolygon.vertices[1].y - bounds.yInset
-  }
-}
-/** Returns removal count */
-function deleteBlocker(blockerIndex) {
-  needsTriangulation = true
-  if (blockers[blockerIndex] === bounds.blocker) bounds.blocker = undefined
-  return blockers.splice(blockerIndex, 1).length;
 }
 
-export function renderBlockers(context) {
-  blockers.forEach(blocker => blocker.render(context))
-}
+// TODO
+// /** Returns removal count */
+// function deleteBlocker(blockerIndex) {
+//   needsTriangulation = true
+//   if (blockers[blockerIndex] === bounds.blocker) bounds.blocker = undefined
+//   return blockers.splice(blockerIndex, 1).length;
+// }
 
 export function addConstructionPoint(p) {
   if (constructingVertices.length == 0) {
     constructingVertices.push(p);
   } else {
-    let mouseDistToStartSqrd = Segment.distanceSqrd(mouse.loc, constructingVertices[0])
+    let mouseDistToStartSqrd = Segment.distanceSqrd(mouse.contextLoc, constructingVertices[0])
     if (constructingVertices.length > 2) {
       if (mouseDistToStartSqrd < 64) {
         finishConstruction()
@@ -99,56 +110,73 @@ export function addConstructionPoint(p) {
     } else if (mouseDistToStartSqrd > 64) {
       constructingVertices.push(p);
     }
-
-    let averageSlope = 0
-    for (let i = 0; i < constructingVertices.length; i++) {
-      let v = constructingVertices[i]
-      let vNext = constructingVertices[(i + 1) % constructingVertices.length]
-      averageSlope += (vNext.x - v.x) * (vNext.y + v.y)
-    }
-    constructingCcw = (averageSlope > 0)
+    syncConstructingCcw();
   }
+}
+export function undoConstructionPoint() {
+  if (!hasConstructorVertices()) return;
+  constructingVertices.pop();
+  syncConstructingCcw();
+}
+
+function syncConstructingCcw() {
+  let averageSlope = 0
+  for (let i = 0; i < constructingVertices.length; i++) {
+    let v = constructingVertices[i]
+    let vNext = constructingVertices[(i + 1) % constructingVertices.length]
+    averageSlope += (vNext.x - v.x) * (vNext.y + v.y)
+  }
+  _constructingCcw = (averageSlope > 0)
 }
 
 export function finishConstruction(p) {
-  if (constructingVertices.length > 2) newBlocker(constructingVertices, bounds.blocker === undefined)
-  else if (constructingVertices.length == 0 && p !== undefined) {
-    // Delete blocker if contains right click
-    for (let b = 0; b < blockers.length; b++) {
-      if (blockers[b].polygon.containsPoint(p)) {
-        deleteBlocker(b)
-        break
-      }
+  if (constructingVertices.length > 2) insertMeshContextHole(constructingVertices)
+  clearConstruction();
+  setCookie('layoutData', serialized(), 365)
+}
+
+/** Delete blocker if contains point `p` */
+export function deleteMeshUnderPoint(p) {
+  if (meshContext === undefined) return;
+  let iHoleCollision = meshContext.holes.findIndex(hole => !hole.bounds.containsPoint(p))
+  if (iHoleCollision > -1) {
+    meshContext.holes.splice(iHoleCollision, 1);
+    meshContext.needsTriangulation();
+    setCookie('layoutData', serialized(), 365)
+  } else {
+    if (meshContext === rootMesh && rootMesh.bounds.containsPoint(p)) {
+        // Remove root if highlighted and outer click
+        meshContext = undefined;
+        rootMesh = undefined;
     }
   }
-  clearConstruction()
 }
 
 export function clearConstruction() {
   constructingVertices = [];
-  constructingCcw = false
+  _constructingCcw = false
 }
 
 export function constructionRender(context) {
   // Draw postprocessed blocker
-  blockers.forEach(blocker => {
-    if (blocker.polygon === undefined) return
+  layoutPolygons.forEach(blocker => {
+    if (blocker === undefined) return
     // Draw boundaries
-    context.strokeStyle = "Green";
+    context.strokeStyle = "gray";
     context.beginPath();
-    blocker.vertices().forEach((vertex, i) => {
+    blocker.vertices.forEach((vertex, i) => {
       if (i == 0) {
         context.moveTo(vertex.x, vertex.y);
       } else {
         context.lineTo(vertex.x, vertex.y);
       }
     });
-    context.lineTo(blocker.vertices()[0].x, blocker.vertices()[0].y);
+    context.lineTo(blocker.vertices[0].x, blocker.vertices[0].y);
     context.stroke();
 
     // Draw holes
     context.fillStyle = "rgba(0, 0, 0, 0.6)";
-    blocker.polygon.holes.forEach((hole) => {
+    blocker.holes.forEach((hole) => {
       hole.vertices.forEach((vertex, i) => {
         if (i == 0) {
           context.beginPath();
@@ -165,10 +193,10 @@ export function constructionRender(context) {
   // Draw construction vertices
   let mouseDistToStartSqrd = undefined
   if (constructingVertices.length > 0) {
-    mouseDistToStartSqrd = Segment.distanceSqrd(mouse.loc, constructingVertices[0])
+    mouseDistToStartSqrd = Segment.distanceSqrd(mouse.contextLoc, constructingVertices[0])
   }
-  context.strokeStyle = constructingCcw ? "Blue" : "Red";
-  context.fillStyle = constructingCcw ? "Blue" : "Red";
+  context.strokeStyle = _constructingCcw ? "Blue" : "Red";
+  context.fillStyle = _constructingCcw ? "Blue" : "Red";
   context.font = '14px sans-serif';
   for (let c = 0; c < constructingVertices.length; c++) {
     let vertex = constructingVertices[c];
@@ -194,7 +222,7 @@ export function constructionRender(context) {
       context.beginPath();
       context.moveTo(vertex.x, vertex.y);
       if (mouseDistToStartSqrd > 64) {
-        context.lineTo(mouse.loc.x, mouse.loc.y);
+        context.lineTo(mouse.contextLoc.x, mouse.contextLoc.y);
       } else {
         context.lineTo(constructingVertices[0].x, constructingVertices[0].y);
       }
@@ -202,7 +230,7 @@ export function constructionRender(context) {
 
       if (mouseDistToStartSqrd > 64) {
         context.beginPath();
-        context.arc(mouse.loc.x, mouse.loc.y, 3, 0, 2 * Math.PI, false);
+        context.arc(mouse.contextLoc.x, mouse.contextLoc.y, 3, 0, 2 * Math.PI, false);
         context.stroke();
       }
     }
@@ -213,54 +241,26 @@ export function constructionRender(context) {
   }
 }
 
-// /**
-//    * Checks blocker collisions against a segment, ray, or line the starts from a vertex
-//    * on the perimeter of the blocker.
-//    * @param Ray ray The ray cast out to collide with any blockers.
-//    * @returns undefined if no collision or ray is internal to self. Else returns a hash with
-//    * the index of the blocker it collided with, the index of the side of the blocker that
-//    * was collided with, and the intersection point.
-//    * @example
-//    * {
-//    *   intersectionPoint: Point,
-//    *   blocker: Blocker,
-//    *   side: Segment
-//    * }
-//    */
-// export function raycast(ray) {
-//   // TODO: Sides that lay along the cast line count shouldn't count as intersect
-//   // Check if ray goes inside its own blocker. If so, return undefined
-
-//   let pierce = {
-//     side: undefined,
-//     distanceSqrd: undefined,
-//     point: undefined
-//   };
-
-//   for (let b = 0; b < blockers.length; b++) {
-//     if (blockers[b].polygon === undefined) continue
-//     let pierceData = blockers[b].pierce(ray)
-//     if (pierceData !== undefined &&
-//       (pierce.distanceSqrd === undefined || pierceData.distanceSqrd < pierce.distanceSqrd)) {
-//       pierce = pierceData
-//     }
-//   }
-
-//   return pierce
-// }
-
 export function route(origin, destination, logged = true) {
-  // move origin and destination outside of any blockers
-  blockers.forEach(blocker => {
-    origin = blocker.polygon.closestPointOutsideFrom(origin)
-    destination = blocker.polygon.closestPointOutsideFrom(destination)
+  origin = meshContext.bounds.closestPointOutsideFrom(origin)
+  destination = meshContext.bounds.closestPointOutsideFrom(destination)
+
+  meshContext.holes.forEach(hole => {
+    origin = hole.bounds.closestPointOutsideFrom(origin)
+    destination = hole.bounds.closestPointOutsideFrom(destination)
   })
+
+  // move origin and destination outside of any blockers
+  // blockers.forEach(blocker => {
+  //   origin = blocker.polygon.closestPointOutsideFrom(origin)
+  //   destination = blocker.polygon.closestPointOutsideFrom(destination)
+  // })
 
   routing = {origin: origin, destination: destination}
   let route = getRoute(getTriangulation(), origin, destination, logged)
 
   let routePolygons = (route.route || []).map(r => r.polygon)
-  triangulationTriangles.forEach(triangle => triangle.highlighted = routePolygons.includes(triangle))
+  meshContext.triangulationPolygons.forEach(triangle => triangle.highlighted = routePolygons.includes(triangle))
 
   let pathBuilder = []
   for (let p = 1; p < (route.path || []).length; p++) {
@@ -273,45 +273,38 @@ export function route(origin, destination, logged = true) {
  * Ensure triangles are generated or regenerated if the layout was changed between the last triangulation
  */
 function getTriangulation() {
-  if (triangulationTriangles === undefined || needsTriangulation) {
-    let holePolygons = []
-    blockers.forEach(holeBlocker => {
-      if (holeBlocker == bounds.blocker) return
-      holePolygons.push(holeBlocker.polygon)
-    })
-    console.log(`Bounds blocker ${bounds.blocker.polygon.logString()}. Holes: ${holePolygons.map(p => p.logString()).join(', ')}`)
+  if (meshContext === undefined) return;
+  if (meshContext._needsTriangulation) {
     try {
-      triangulationTriangles = getTriangulatedGraph(bounds.blocker.polygon, holePolygons)
+      meshContext.setTriangulation(getTriangulatedGraph(meshContext.bounds, meshContext.holes.map(hole => hole.bounds.copy.reverse())))
     } catch(e) {
       console.log(`No bridges ${e}`, e)
-      triangulationTriangles = [];
+      meshContext.setTriangulation([]);
     }
-    log(`Triangles`, triangulationTriangles)
-    needsTriangulation = false
+    log(`Triangles`, meshContext.triangulationPolygons)
     if (routing !== undefined) route(routing.origin, routing.destination)
   }
 
-  return triangulationTriangles
+  return meshContext.triangulationPolygons
 }
 
 export function renderTriangulation(context) {
+  if (meshContext === undefined) return;
   getTriangulation()
 
-  if (visibleTriangulation) {
-    triangulationTriangles.forEach(polygon => {
-      context.strokeStyle = "rgba(50, 50, 200, 0.2)"
-      context.fillStyle = "rgba(50, 50, 200, 0.02)"
-      if (polygon.highlighted !== undefined && polygon.highlighted) {
-        context.fillStyle = "rgba(50, 50, 200, 0.2)"
-      }
-      context.beginPath();
-      context.moveTo(polygon.vertices[0].x, polygon.vertices[0].y);
-      polygon.vertices.forEach(vertex => context.lineTo(vertex.x, vertex.y))
-      context.lineTo(polygon.vertices[0].x, polygon.vertices[0].y);
-      if (!polygon.clockwise) context.fill()
-      context.stroke();
-    });
-  }
+  meshContext.triangulationPolygons.forEach(polygon => {
+    context.strokeStyle = "rgba(50, 50, 200, 0.2)"
+    context.fillStyle = "rgba(55, 55, 180, 0.1)"
+    if (polygon.highlighted !== undefined && polygon.highlighted) {
+      context.fillStyle = "rgba(50, 50, 200, 0.2)"
+    }
+    context.beginPath();
+    context.moveTo(polygon.vertices[0].x, polygon.vertices[0].y);
+    polygon.vertices.forEach(vertex => context.lineTo(vertex.x, vertex.y))
+    context.lineTo(polygon.vertices[0].x, polygon.vertices[0].y);
+    if (polygon.counterclockwise) context.fill()
+    if (visibleTriangulation) context.stroke();
+  });
 
   pathfindingRoute.forEach(segment => {
     context.strokeStyle = "rgb(50, 50, 50)"
@@ -327,27 +320,22 @@ export function renderTriangulation(context) {
     context.moveTo(segment.a.x, segment.a.y)
     context.lineTo(segment.b.x, segment.b.y)
     context.stroke()
-    // context.fillText(segment.a.logString(), segment.a.x+5, segment.a.y - 5)
-    // context.fillText(segment.b.logString(), segment.b.x+5, segment.b.y - 5)
   })
 }
 
-export function saveToCookies() {
-  setCookie('layoutData', serialized(), 365)
-}
-
+/** Recursive JSON builder for layout meshes. */
 export function serialized() {
-  let serializedBlockers = []
-  blockers.forEach(blocker => {
-    serializedBlockers = serializedBlockers.concat(blocker.serialized())
-  })
-  return JSON.stringify(serializedBlockers)
+  if (rootMesh === undefined) return;
+
+  const _serializeNode = (node) => { return {
+    bounds: node.bounds.vertices.map(v => {return {x: v.x, y: v.y}}),
+    holes: node.holes.map(_serializeNode)
+  }}
+
+  return JSON.stringify([_serializeNode(rootMesh)]);
 }
 
 export function reset() {
-  blockers = []
-  needsTriangulation = true
-  bounds.blocker = undefined
   setCookie('layoutData', '', 0)
   loadFromServer()
 }
@@ -362,8 +350,7 @@ export function load() {
 function loadFromCookies() {
   let cookieData = getCookie('layoutData')
   if (cookieData !== '') {
-    let blockers = JSON.parse(cookieData)
-    blockers.forEach(b => newBlocker(b.map(v => new Point(v[0], v[1])), bounds.blocker === undefined))
+    parseLayout(cookieData);
     return true
   }
   return false
@@ -374,14 +361,27 @@ function loadFromServer() {
   let xmlhttp = new XMLHttpRequest();
   xmlhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
-      let blockers = JSON.parse(this.responseText)
-      blockers.forEach(b => newBlocker(b.map(p => new Point(p[0], p[1])), bounds.blocker === undefined))
-
-      saveToCookies()
+      parseLayout(this.responseText);
+      // Save to cookies
+      setCookie('layoutData', serialized(), 365)
     }
   };
   xmlhttp.open("GET", defaultJsonLayoutUrl, true);
   xmlhttp.send();
+}
+
+/** Parses a serialized (to JSON) layout string. */
+export function parseLayout(serializedLayoutString) {
+  const _processNode = (node, parent) => {
+    node.holes.forEach(hole => {
+      let polygon = new Polygon(hole.bounds).reverse();
+      layoutPolygons.push(polygon);
+      _processNode(hole, parent.applyHole(polygon));
+    })
+  }
+  let node = JSON.parse(serializedLayoutString)[0];
+  meshContext = undefined; // Reset root
+  _processNode(node, insertMeshContextHole(node.bounds));
 }
 
 function setCookie(cname, cvalue, exdays) {

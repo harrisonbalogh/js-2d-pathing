@@ -5,6 +5,6 @@
   "author": "Harrison Balogh",
   "license": "ISC",
   "devDependencies": {
-    "@harxer/geometry": "^1.2.0"
+    "@harxer/geometry": "^1.2.11"
   }
 }

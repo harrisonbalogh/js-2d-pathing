@@ -1,12 +1,11 @@
-import { Segment, Vector, Polygon } from '../../node_modules/@harxer/geometry/geometry.js'
+import { Segment, Vector, Polygon, orientation } from '../../node_modules/@harxer/geometry/geometry.js'
 import {optimizeTriangulation as optimize} from './Layout.js'
 import log from '../log.js';
-import Blocker from './Blocker.js'
 
 /** Controls threshold for graph optimization for conjoining triangles. */
 let TRIANGULATION_ANGLE_BOUND = (30) / 180 * Math.PI
 
-const DEBUG = true;
+const DEBUG = false;
 
 /**
  * Apply Delaunay triangulation to obtain an array of edge-sharing triangles.
@@ -23,7 +22,7 @@ export default function getTriangulatedGraph(boundsPolygon, holePolygons) {
   const graphEdges = _ => graphBuilder.map(({vertex}, i) => new Segment(vertex, graphBuilder[(i + 1) % graphBuilder.length].vertex))
 
   /** Update graphBuilder node at provided index i with angle attribute. */
-  const setNodeAngle = (i) => {
+  const setNodeInnerAngle = (i) => {
     let node = graphBuilder[i];
 
     let vPrev = graphBuilder[(i - 1) < 0 ? graphBuilder.length - 1 : (i - 1)].vertex;
@@ -33,7 +32,14 @@ export default function getTriangulatedGraph(boundsPolygon, holePolygons) {
     let prevVector = new Vector(vPrev.x - v.x, vPrev.y - v.y);
     let nextVector = new Vector(vNext.x - v.x, vNext.y - v.y);
 
+    let cross = prevVector.crossProduct(nextVector)
     node.angle = Math.acos(prevVector.dotProduct(nextVector) / (prevVector.magnitude * nextVector.magnitude));
+    if (cross <= 0 || Number.isNaN(cross)) {
+      // Convex
+      node.angle = 2 * Math.PI - node.angle;
+    }
+    if (DEBUG) log(`  Angle node compute ${node.angle / Math.PI * 180}.`, [new Segment(v, v.copy.add(prevVector)), new Segment(v, v.copy.add(nextVector))])
+    return node;
   }
 
   /** Updates convex and eartip state and angle of node in current graph.
@@ -82,15 +88,24 @@ export default function getTriangulatedGraph(boundsPolygon, holePolygons) {
       let {distSqrd, bridgeCandidate} = graphBuilder
         .map(({vertex: boundsVertex}) => new Segment(boundsVertex, holeVertex))
         // .forEach(({bridgeCandidate, iBoundsVertex}) => log(`v ${iBoundsVertex}  `, [bridgeCandidate]))
-        .filter(bridgeCandidate =>
+        .filter(bridgeCandidate => {
           // if (DEBUG) log(`  - Bridge candidate`, [bridgeCandidate])
           // Check intersections with this hole's edges - ignoring endpoint overlaps
-          hole.edges.every(holeEdge => holeEdge.a.equals(holeVertex) || holeEdge.b.equals(holeVertex) || !holeEdge.intersects(bridgeCandidate)) &&
+          return hole.edges.every(holeEdge => {
+            // if (DEBUG && !(holeEdge.a.equals(holeVertex) || holeEdge.b.equals(holeVertex) || !holeEdge.intersects(bridgeCandidate))) log('Intersecting self!', [holeEdge])
+            return holeEdge.a.equals(holeVertex) || holeEdge.b.equals(holeVertex) || !holeEdge.intersects(bridgeCandidate);
+          }) &&
           // Check intersections with bounds edges - ignoring endpoint overlaps
-          graphEdges().every(boundsEdge => boundsEdge.a.equals(bridgeCandidate.a) || boundsEdge.b.equals(bridgeCandidate.a) || !boundsEdge.intersects(bridgeCandidate)) &&
+          graphEdges().every(boundsEdge => {
+            // if (DEBUG && !(boundsEdge.a.equals(bridgeCandidate.a) || boundsEdge.b.equals(bridgeCandidate.a) || !boundsEdge.intersects(bridgeCandidate))) log('Intersecting bounds', [boundsEdge])
+            return boundsEdge.a.equals(bridgeCandidate.a) || boundsEdge.b.equals(bridgeCandidate.a) || !boundsEdge.intersects(bridgeCandidate);
+          }) &&
           // Check intersections with other hole's edges
-          holePolygonsRemaining.every((peerHole, iPeerHole) => iPeerHole <= I_HOLE || peerHole.edges.every(peerHoleEdge => !peerHoleEdge.intersects(bridgeCandidate)))
-        )
+          holePolygonsRemaining.every(peerHole => peerHole.edges.every(peerHoleEdge => {
+            // if (DEBUG && !(!peerHoleEdge.intersects(bridgeCandidate))) log('Intersecting peer', [peerHoleEdge])
+            return !peerHoleEdge.intersects(bridgeCandidate)
+          }))
+        })
         .reduce((shortestBridgeCandidate, bridgeCandidate) => {
           let distSqrd = bridgeCandidate.distanceSqrd();
           if (distSqrd < shortestBridgeCandidate.distSqrd) return { distSqrd, bridgeCandidate };
@@ -114,28 +129,84 @@ export default function getTriangulatedGraph(boundsPolygon, holePolygons) {
 
     if (DEBUG) log(`Bridge edge generated ${bridgeEdge.logString()} at ${iHoleVertex}`, [bridgeEdge])
 
-    // Insert hole and bridge vertices into composite polygon
+    // Insert hole and bridge vertices into composite polygon // TODO - no need to concat, can just splice it into graphBuilder
     let shiftedHoleVertices = hole.vertices.slice(iHoleVertex + 1).concat(hole.vertices.slice(0, iHoleVertex + 1))
     // if (DEBUG) log(`shiftedHoleVertices`, shiftedHoleVertices.concat([new Segment(shiftedHoleVertices[0], shiftedHoleVertices[0].copy.add({x: 0, y: -50}))]))
     // if (DEBUG) log(`iBoundsVertex ${iBoundsVertex}`, [new Segment(shiftedHoleVertices[0], shiftedHoleVertices[0].copy.add({x: 0, y: -50}))])
-    // Insert bridge and hole into smallest angle vertex for overlapped bridge insertions
-    let boundsVertexEntry = graphBuilder.reduce((smallest, node, iNode) => {
-      // Find overlapping bridge intersections
-      if (!bridgeEdge.a.equals(node.vertex)) return smallest;
-      setNodeAngle(iNode);
-      if (DEBUG) log(`  Vertex angle ${node.angle}`, [node.vertex]);
-      // Select smallest inner angle
-      if (node.angle > smallest.angle) return {angle: node.angle, iNode}
-      return smallest;
-    }, {angle: 0}).iNode;
+    // Insert bridge and hole into sorted angle angle vertex for overlapped bridge insertions
+
+    /** Get inner angle if bridge was inserted at given index in graph. */
+    const bridgeInnerAngle = function(i) {
+      let vPrev = graphBuilder[(i - 1) < 0 ? graphBuilder.length - 1 : (i - 1)].vertex;
+      let v = bridgeEdge.a;
+      let vNext = bridgeEdge.b;
+      let prevVector = new Vector(vPrev.x - v.x, vPrev.y - v.y);
+      let nextVector = new Vector(vNext.x - v.x, vNext.y - v.y);
+      let cross = prevVector.crossProduct(nextVector)
+      let angle = Math.acos(prevVector.dotProduct(nextVector) / (prevVector.magnitude * nextVector.magnitude));
+      if (cross <= 0 || Number.isNaN(cross)) {
+        // Convex
+        angle = 2 * Math.PI - angle;
+      }
+      if (DEBUG) log(`  Angle bridge compute ${angle / Math.PI * 180}`, [new Segment(v, v.copy.add(prevVector)), new Segment(v, v.copy.add(nextVector))])
+      return angle;
+    }
+
+    // Bridge and hole vertices are inserted by...
+    let overlappingNodes = graphBuilder
+      // ...finding all overlapping bridge insertions (populate angle for next step, if necessary)...
+      .filter(({vertex}, iNode) => {
+        if (bridgeEdge.a.equals(vertex)) {
+          if (bridgeInnerAngle(iNode) > setNodeInnerAngle(iNode).angle) {
+            if (DEBUG) log(`     Excluding vertex ${bridgeInnerAngle(iNode) * 180 / Math.PI} vs ${setNodeInnerAngle(iNode).angle * 180 / Math.PI}`, [vertex])
+            return false
+          }
+          return true;
+        }
+        return false;
+      })
+      // ...sorting them by inner angle (populated with previous step)...
+      .sort((a, b) => a.angle - b.angle);
+    // ...finally insert into sorted angle order.
+    let boundsVertexEntry = graphBuilder.indexOf(overlappingNodes[0]);
+    if (DEBUG) log(`First overlap index ${boundsVertexEntry}`, [graphBuilder[boundsVertexEntry].vertex]);
+    if (overlappingNodes.length > 1) {
+      let insertionAngle = (function() {
+        let i = boundsVertexEntry;
+        let vPrev = graphBuilder[(i - 1) < 0 ? graphBuilder.length - 1 : (i - 1)].vertex;
+        let v = bridgeEdge.a;
+        let vNext = bridgeEdge.b;
+        let prevVector = new Vector(vPrev.x - v.x, vPrev.y - v.y);
+        let nextVector = new Vector(vNext.x - v.x, vNext.y - v.y);
+        return Math.acos(prevVector.dotProduct(nextVector) / (prevVector.magnitude * nextVector.magnitude));
+      })();
+      let iLow = 0, iHigh = overlappingNodes.length;
+      while (iLow < iHigh) {
+        let iMid = (iLow + iHigh) >>> 1; // Divide by 2 and floor.
+        if (overlappingNodes[iMid] < insertionAngle) iLow = iMid + 1;
+        else iHigh = iMid;
+      }
+      boundsVertexEntry = graphBuilder.indexOf(overlappingNodes[iLow]);
+      if (DEBUG) log(`Insertion ${boundsVertexEntry}`, overlappingNodes.map(node => new Segment(graphBuilder[graphBuilder.indexOf(node)].vertex, graphBuilder[graphBuilder.indexOf(node) + 1].vertex)));
+    }
+
+    // let boundsVertexEntry = graphBuilder.reduce((smallest, node, iNode) => {
+    //   // Find overlapping bridge intersections
+    //   if (!bridgeEdge.a.equals(node.vertex)) return smallest;
+    //   setNodeInnerAngle(iNode);
+    //   // if (DEBUG) log(`  Vertex angle ${node.angle}`, [node.vertex]);
+    //   // Select smallest inner angle
+    //   if (node.angle > smallest.angle) return {angle: node.angle, iNode}
+    //   return smallest;
+    // }, {angle: 0}).iNode;
     // let boundsVertexEntry = graphBuilder.findLastIndex((({vertex}) => bridgeEdge.a.equals(vertex)))
-    if (DEBUG) log(`Insert here ${boundsVertexEntry}`, [bridgeEdge, ...graphBuilder.map(({vertex}) => vertex)])
+    // if (DEBUG) log(`Insert here ${boundsVertexEntry}`, [bridgeEdge, ...graphBuilder.map(({vertex}) => vertex)])
     graphBuilder.splice(boundsVertexEntry, 0, ...[bridgeEdge.a, bridgeEdge.b, ...shiftedHoleVertices].map(vertex => {return { vertex }}))
     // if (DEBUG) log('graph', graphBuilder.map(({vertex}) => vertex).filter((node, i) => graphBuilder.every(({vertex: other}, iOther) => i <= iOther || !node.equals(other))))
     // if (DEBUG) graphBuilder.forEach(({vertex}, i) => log(`graph ${i}`, [vertex]))
   }
 
-  if (DEBUG) graphBuilder.forEach(({vertex}, i) => log(`Final graph ${i}`, [vertex]))
+  if (DEBUG) graphBuilder.forEach(({vertex}, i) => i > 0 ? log(`Final graph ${i}`, [new Segment(graphBuilder[i - 1].vertex, vertex  )]) : undefined)
   graphBuilder.forEach(setNodeData);
 
   let triangles = [];

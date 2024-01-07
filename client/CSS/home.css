@@ -1,6 +1,10 @@
 @charset "UTF-8";
 /* CSS Document */
 
+:root {
+  --control-setting-divider-height: 4px;
+}
+
 canvas {
   height: 100%;
   margin: 0;
@@ -28,12 +32,28 @@ canvas {
 .controls-settings {
   border-bottom: 1px solid black;
   cursor: default;
+  flex-shrink: 0;
   list-style: none;
-  height: 30%;
+  height: 50%;
   overflow-y: auto;
   margin: 0;
   padding: 0;
   width: 100%;
+}
+
+.control-setting-divider {
+  border-top: 1px solid gray;
+  color: gray;
+  font-size: 10px;
+  padding: 4px;
+  margin: 6px 0 0 0;
+  padding-bottom: 0;
+}
+
+.controls-settings li {
+  color: var(--color-background);
+  cursor: pointer;
+  font-size: 12px;
 }
 
 .controls-settings::-webkit-scrollbar {
@@ -41,44 +61,119 @@ canvas {
   width: 0;
 }
 
-.controls-settings li {
+.controls-settings li.setting-item-toggle {
   background: url("../images/icon_settings@2x.png") no-repeat left center/16px;
   border-radius: 12px;
-  color: var(--color-background);
-  cursor: pointer;
-  font-size: 12px;
   line-height: 26px;
   margin: 6px 6px 0 4px;
   padding: 0 0 0 20px;
 }
-.controls-settings li:hover {
+.controls-settings li.setting-item-toggle:hover {
   text-decoration: underline;
 }
-.controls-settings li.active {
+.controls-settings li.setting-item-toggle.active {
   background-image: url("../images/icon_settings_x@2x.png");
   background-color: lightgray;
 }
 
-.controls-settings li.setting-sub[lastElement] {
+.controls-settings li.setting-item-toggle.setting-sub[lastElement] {
   margin-bottom: 8px;
   border-radius: 0 0 12px 12px;
 }
 
-.controls-settings li.setting-sub {
+.controls-settings li.setting-item-toggle.setting-sub {
   border-radius: 0;
   background-color: rgb(220, 220, 220);
   margin: 0 16px;
 }
 
-.controls-settings li.setting-sub.hidden {
+.controls-settings li.setting-item-toggle.setting-sub.hidden {
   display: none;
+}
+
+.controls-settings li.setting-item-button {
+  background-color: lightgray;
+  border-radius: 12px;
+  line-height: 26px;
+  margin: 6px 6px 0 4px;
+  padding: 0 0 0 20px;
+}
+.controls-settings li.setting-item-button:hover {
+  background-color: gray;
+  color: white;
+  text-decoration: underline;
+}
+
+.controls-settings .settings-item-toolbox>ul {
+  /* background-color: lightgray; */
+  /* border: 2px solid gray; */
+  /* border-radius: 12px; */
+  list-style: none;
+  margin: 6px 6px 0 4px;
+  padding: 0;
+  display: flex;
+}
+.controls-settings .settings-item-toolbox>ul>li:first-child {
+  border-radius: 4px 0 0 4px;
+  border-width: 2px 0 2px 2px;
+}
+.controls-settings .settings-item-toolbox>ul>li:last-child {
+  border-radius: 0 4px 4px 0;
+  border-width: 2px 2px 2px 0;
+}
+.controls-settings .settings-item-toolbox>ul>li {
+  background: url("../images/icon_settings@2x.png") no-repeat center/55%;
+  background-color: lightgray;
+  border: 2px solid gray;
+  display: inline-block;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  width: 26px;
+}
+.controls-settings .settings-item-toolbox>ul>li.active {
+  border-color: black;
+  background-color: white;
+}
+#settings-item-toolbox-pointer {
+  background-image: url("../images/toolbox_icon_cursor.svg");
+}
+#settings-item-toolbox-pointer.active {
+  background-image: url("../images/toolbox_icon_cursor_alt.svg");
+}
+#settings-item-toolbox-constructor {
+  background-image: url("../images/toolbox_icon_vertex_add.svg");
+}
+#settings-item-toolbox-constructor.active {
+  background-image: url("../images/toolbox_icon_vertex_add_alt.svg");
+}
+#settings-item-toolbox-eraser {
+  background-image: url("../images/toolbox_icon_vertex_remove.svg");
+}
+#settings-item-toolbox-eraser.active {
+  background-image: url("../images/toolbox_icon_vertex_remove_alt.svg");
+}
+
+/* - - - - - - - - DIVIDER - - - - - - - - */
+
+.content-divider {
+  cursor: ns-resize;
+  border-bottom: 1px solid black;
+  font-size: 20px;
+  font-weight: bold;
+  height: 0;
+  margin: 0;
+  margin-top: -3px;
+  padding: 0;
+  padding-bottom: 8px;
+  line-height: 0;
+  text-align: center;
 }
 
 /* - - - - - - - - OUT - - - - - - - - */
 
 .content-output {
   font-size: 10px;
-  height: 70%;
   list-style: none;
   margin: 0;
   overflow: hidden auto;
@@ -107,4 +202,67 @@ canvas {
   margin: 0;
   padding: 0;
   width: 5px;
+}
+
+/* - - - - - - - - MODAL - - - - - - - - */
+
+.modal {
+  position: absolute;
+  inset: 0 0 0 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  text-align: center;
+}
+.modal>div {
+  box-shadow: 0 0 20px 0 black;
+  background-color: white;
+  border-radius: 14px;
+  margin: 0;
+  max-width: 400px;
+  padding: 20px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 90%;
+  transform: translate(-50%, -50%);
+}
+
+#modal-layout-load>div {
+  text-align: left;
+}
+#modal-layout-load>div>p {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+}
+.modal>div>.modal-close {
+  cursor: pointer;
+  border-radius: 4px 12px 4px 4px;
+  border: 1px solid gray;
+  background-color: transparent;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+.modal>div>.modal-close:hover{
+  background-color: lightgray;
+  border-color: transparent;
+  color: white;
+}
+
+
+#modal-layout-load>div>textarea {
+  border: 1px solid black;
+  min-height: 200px;
+  width: 98%;
+}
+
+#modal-layout-button-load {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  float: right;
+  margin-top: 10px;
+}
+
+#modal-layout-load {
+  display: none;
 }
