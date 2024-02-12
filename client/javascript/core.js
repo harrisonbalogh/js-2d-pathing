@@ -2,7 +2,7 @@ import './Layout2D/Error.js'
 import { Point } from '../node_modules/@harxer/geometry/geometry.js'
 import * as Layout from './Layout2D/Layout.js'
 import { renderLogData, disableLogging, selectLogNext, selectLogPrev, attachLogOut } from './log.js'
-import log from './log.js'
+import log, { clear as clearConsole } from './log.js'
 
 // ==================================================================================================================== Variables =====
 const RENDER_HERTZ = 1000 / 60 // Render update speed
@@ -22,12 +22,13 @@ const MOUSE_TOOL = {
   POINTER: 0,
   MESH_CONSTRUCTOR: 1,
   MESH_ERASER: 2,
+  PATHER: 3
 }
 
 export let mouse = {
   loc: new Point(0, 0),
-  lastLeftClick: new Point(0, 0),
-  lastRightClick: new Point(0, 0),
+  lastLeftClick: undefined,
+  lastRightClick: undefined,
   tool: MOUSE_TOOL.POINTER,
   get contextLoc() {
     return new Point(this.loc.x - view.x, this.loc.y - view.y)
@@ -37,11 +38,10 @@ export let mouse = {
 document.getElementById('settings-item-toolbox-pointer').className = 'active';
 let mouseLabelsVisible = true;
 
-let gridify = false;
-
 let meshConstructorToolActive = false;
 let meshEraserToolActive = false; // TODO NYI
-let canvasMouseDragging = false;
+/** 0 - no mouse drag, 1 - left mouse drag, 2 - right mouse drag */
+let canvasMouseDragging = 0;
 
 let parallelBarsVisible = false;
 let parallelBarDragging = {top: false, left: false}
@@ -73,6 +73,7 @@ const SETTING_BUTTON_ELEMENTS_MAP = {
   'setting-item-mesh-reset': resetLayout,
   'setting-item-mesh-load': loadLayout,
   'setting-item-mesh-print': printLayout,
+  'setting-item-console-clear': clearConsole,
 }
 Object.keys(SETTING_BUTTON_ELEMENTS_MAP).forEach(
   elemId => document.getElementById(elemId).addEventListener('click', e => {
@@ -139,6 +140,9 @@ function loadLayout() {
 }
 function printLayout() {
   log(Layout.serialized())
+  if (mouse.tool === MOUSE_TOOL.PATHER) {
+    log(`Left mouse: ${mouse.lastLeftClick?.logString()}. Right mouse: ${mouse.lastRightClick?.logString()}`)
+  }
 }
 
 function handleToolboxClick(e) {
@@ -154,11 +158,15 @@ function handleToolboxClick(e) {
   } else
   if (e.target.id === 'settings-item-toolbox-eraser') {
     mouse.tool = MOUSE_TOOL.MESH_ERASER;
+  } else
+  if (e.target.id === 'settings-item-toolbox-pather') {
+    mouse.tool = MOUSE_TOOL.PATHER;
   }
 }
 document.getElementById('settings-item-toolbox-pointer').addEventListener('click', handleToolboxClick)
 document.getElementById('settings-item-toolbox-constructor').addEventListener('click', handleToolboxClick)
 document.getElementById('settings-item-toolbox-eraser').addEventListener('click', handleToolboxClick)
+document.getElementById('settings-item-toolbox-pather').addEventListener('click', handleToolboxClick)
 
 // =================================================================================================================== Test rendering =====
 let test_points = [];
@@ -373,7 +381,14 @@ const handleKeyDown = keyDownEvent => {
 document.addEventListener('keydown', handleKeyDown)
 
 canvas_bg.onmousedown = e => {
+  if (e.button === 0) { // Left click
+    mouse.lastLeftClick = mouse.loc.copy;
+  } else { // Right click
+    mouse.lastRightClick = mouse.loc.copy;
+  }
+
   if (mouse.tool === MOUSE_TOOL.MESH_CONSTRUCTOR) {
+
     if (e.button === 0) {  // Left click add vertex or finish mesh if closed shape
       Layout.addConstructionPoint(mouse.contextLoc);
     } else { // Right click take back last constructor vertex or erase if no construction in progress
@@ -383,55 +398,38 @@ canvas_bg.onmousedown = e => {
         Layout.deleteMeshUnderPoint(mouse.contextLoc);
       }
     }
+
   } else if (mouse.tool === MOUSE_TOOL.MESH_ERASER) {
+
     Layout.deleteMeshUnderPoint(mouse.contextLoc);
+
   } else if (mouse.tool === MOUSE_TOOL.POINTER) {
-    // if (parallelBarsVisible) {
-    //   let x = Layout.bounds.xInset + PARALLEL_SETTER_TOP_X;
-    //   let y = Layout.bounds.yInset + PARALLEL_SETTER_TOP_Y;
-    //   if (
-    //     mouse.contextLoc.x > x && mouse.contextLoc.x < (Layout.bounds.width - x) &&
-    //     y < mouse.contextLoc.y && mouse.contextLoc.y < (y + PARALLEL_SETTER_TOP_H)
-    //   ) {
-    //     parallelBarDragging.top = true;
-    //     parallelBarDragging.left = false;
-    //     return;
-    //   } else
-    //   if (
-    //     y < mouse.contextLoc.x && mouse.contextLoc.x < (y + PARALLEL_SETTER_TOP_H) &&
-    //     mouse.contextLoc.y > x && mouse.contextLoc.y < (Layout.bounds.width - x)
-    //   ) {
-    //     parallelBarDragging.left = true;
-    //     parallelBarDragging.top = false;
-    //     return;
-    //   } else {
-    //     parallelBarDragging.top = false;
-    //     parallelBarDragging.left = false;
-    //   }
-    // }
 
     if (e.button === 0) { // Left click
-      mouse.lastLeftClick = new Point(mouse.loc.x, mouse.loc.y)
-
-      //TODO: temp test
       Layout.contextSelection(mouse.contextLoc);
     } else { // Right click
-      mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
-
-      canvasMouseDragging = true;
+      canvasMouseDragging = 2;
     }
 
-    if (!meshConstructorToolActive && gridify) {
-      test_lines = []
-      test_circles = []
-      test_points = []
+  } else if (mouse.tool === MOUSE_TOOL.PATHER) {
 
-      Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
+    canvasMouseDragging = e.button === 0 ? 1 : 2;
 
-      // testLine(mouse.lastLeftClick, mouse.lastRightClick)
-      testCircle(mouse.lastLeftClick.x, mouse.lastLeftClick.y, 6)
-      testCircle(mouse.lastRightClick.x, mouse.lastRightClick.y, 6)
+    let contextLeftMouse, contextRightMouse;
+
+    if (mouse.lastLeftClick) {
+      contextLeftMouse = mouse.lastLeftClick.copy.minus(view);
+      testCircle(contextLeftMouse.x, contextLeftMouse.y, 6, true)
     }
+    if (mouse.lastRightClick) {
+      contextRightMouse = mouse.lastRightClick.copy.minus(view);
+      testCircle(contextRightMouse.x, contextRightMouse.y, 6)
+    }
+
+    if (mouse.lastLeftClick && mouse.lastRightClick) {
+      Layout.route(contextLeftMouse, contextRightMouse);
+    }
+
   }
 
   e.preventDefault();
@@ -443,57 +441,36 @@ canvas_bg.onmousemove = e => {
   let rect = canvas_bg.getBoundingClientRect();
   mouse.loc = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top))
 
-  // // Parallel bar dragging
-  // if (parallelBarsVisible) disableLogging(parallelBarDragging.top || parallelBarDragging.left)
-  // if (parallelBarDragging.top || parallelBarDragging.left) {
-  //   if (parallelBarDragging.top) {
-  //     mouse.lastLeftClick = new Point(Math.min(Math.max(mouse.contextLoc.x, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X), 0)
-  //     mouse.lastRightClick = new Point(Math.min(Math.max(mouse.contextLoc.x, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X), Layout.bounds.width)
-  //   } else
-  //   if (parallelBarDragging.left) {
-  //     mouse.lastLeftClick = new Point(0, Math.min(Math.max(mouse.contextLoc.y, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X))
-  //     mouse.lastRightClick = new Point(Layout.bounds.width, Math.min(Math.max(mouse.contextLoc.y, PARALLEL_SETTER_TOP_X), Layout.bounds.width - PARALLEL_SETTER_TOP_X))
-  //   }
-  //   disableLogging(true)
-  //   Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
-  //   disableLogging(false)
-  // } else if (!meshConstructorToolActive) {
-  //   // Drag pathing
-  //   if (e.buttons === 1 || e.buttons == 2) {
-  //     if (e.buttons === 1) {
-  //       mouse.lastLeftClick = new Point(mouse.contextLoc.x, mouse.contextLoc.y)
-  //     } else if (e.buttons == 2) {
-  //       mouse.lastRightClick = new Point(mouse.contextLoc.x, mouse.contextLoc.y)
-  //     }
+  if (canvasMouseDragging > 0) {
+    if (mouse.tool === MOUSE_TOOL.POINTER) {
+      let x = mouse.loc.x - mouse.lastRightClick.x;
+      let y = mouse.loc.y - mouse.lastRightClick.y;
+      mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
+      canvasMasterContext.translate(x, y)
+      view.x += x
+      view.y += y
+    } else if (mouse.tool === MOUSE_TOOL.PATHER) {
+      if (canvasMouseDragging === 1) { // Left click
+        mouse.lastLeftClick = mouse.loc.copy;
+      } else { // Right click
+        mouse.lastRightClick = mouse.loc.copy;
+      }
 
-  //     if (!meshConstructorToolActive && gridify) {
-  //       test_lines = []
-  //       test_circles = []
-  //       test_points = []
+      disableLogging(true);
 
-  //       disableLogging(true)
-  //       Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
-  //       disableLogging(false)
+      let contextLeftMouse = mouse.lastLeftClick.copy.minus(view);
+      let contextRightMouse = mouse.lastRightClick.copy.minus(view);
+      testCircle(contextLeftMouse.x, contextLeftMouse.y, 6, true)
+      testCircle(contextRightMouse.x, contextRightMouse.y, 6)
 
-  //       // testLine(mouse.lastLeftClick, mouse.lastRightClick)
-  //       testCircle(mouse.lastLeftClick.x, mouse.lastLeftClick.y, 6)
-  //       testCircle(mouse.lastRightClick.x, mouse.lastRightClick.y, 6)
-  //     }
-  //   }
-  // }
-
-  if (canvasMouseDragging) {
-    let x = mouse.loc.x - mouse.lastRightClick.x;
-    let y = mouse.loc.y - mouse.lastRightClick.y;
-    mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
-    canvasMasterContext.translate(x, y)
-    view.x += x
-    view.y += y
+      Layout.route(contextLeftMouse, contextRightMouse);
+    }
   }
 }
 
 canvas_bg.onmouseup = e => {
   canvasMouseDragging = false;
+  disableLogging(false);
 }
 
 canvas_bg.oncontextmenu = e => e.preventDefault()

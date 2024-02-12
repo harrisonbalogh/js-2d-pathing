@@ -21,6 +21,13 @@ export function attachLogOut(list_element) {
   contentOut = list_element
 }
 
+export function clear() {
+  if (!contentOut) throw 'Logging was not configured with a list element with setup() call'
+  logSelected = undefined
+  contentOut.innerHTML = "";
+  logData = []
+}
+
 /**
  * Text is required and will be placed into the output list in its own list item.
  * Optional parameter 'data' can be an array with segments, points, vectors, rays, polygons, and blockers.

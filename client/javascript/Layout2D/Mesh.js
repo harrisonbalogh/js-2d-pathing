@@ -8,23 +8,26 @@ import { Polygon } from '../../node_modules/@harxer/geometry/geometry.js';
  */
 export default class Mesh {
   constructor(polygon, holes = [], parent) {
-    /** Boundary polygon */
+    /** Boundary polygon. @type {Polygon} */
     this.bounds = polygon;
-    /** [Mesh] */
+    /** @type {[Mesh]} */
     this.holes = holes;
+    /** @type {boolean} */
     this._needsTriangulation = true;
-    this.triangulationPolygons = [];
+    /** @type {[GraphTriangle]} */
+    this.triangulatedGraph = [];
+    /** @type {Mesh} */
     this.parent = parent;
   }
 
   needsTriangulation() {
     this._needsTriangulation = true;
-    this.triangulationPolygons = [];
+    this.triangulatedGraph = [];
   }
 
   setTriangulation(polygons) {
     this._needsTriangulation = false;
-    this.triangulationPolygons = polygons;
+    this.triangulatedGraph = polygons;
   }
 
   // vertices() {
@@ -65,13 +68,12 @@ export default class Mesh {
       log(`Union bounds`, [polygon, this.bounds])
     } else if (polygon.counterclockwise && polygon.vertices.some(vertex => !self.bounds.containsPoint(vertex))) {
       // Internal contained polygons become holes
-      // TODO: Test for overlap with other holes
       let newMesh;
       let iOverlappedHole = this.holes.findIndex(hole => hole.bounds.overlaps(polygon));
       if (iOverlappedHole !== -1) {
         while (iOverlappedHole !== -1) {
           let overlappedHole = this.holes.splice(iOverlappedHole, 1)[0].bounds.copy.reverse();
-          let overlayHole = newMesh ? newMesh.bounds : polygon;
+          let overlayHole = newMesh ? newMesh.bounds.reverse() : polygon;
           log(`Union hole ${overlappedHole.logString()}`, [overlappedHole])
           log(`  ... onto ${overlayHole.logString()}`, [overlayHole])
           let unionPolygon = overlappedHole.union(overlayHole).reverse();
@@ -80,14 +82,34 @@ export default class Mesh {
 
           iOverlappedHole = this.holes.findIndex(hole => hole.bounds.overlaps(unionPolygon));
           if (iOverlappedHole === -1) {
+
+            // Remove holes swallowed by new hole
+            let iInternalHole = this.holes.findIndex(hole => !newMesh.bounds.contains(hole.bounds));
+            while (iInternalHole !== -1) {
+              log(`Removing smaller internal hole`, [this.holes.splice(iInternalHole, 1)])
+              iInternalHole = this.holes.findIndex(hole => !newMesh.bounds.contains(hole.bounds));
+            }
+
             this.holes.push(newMesh)
             log(`Adding union hole`, [newMesh.bounds])
             return newMesh;
           }
         }
       } else {
+        if (this.holes.some(hole => !hole.bounds.contains(polygon))) {
+          log(`Ignoring internal polygon.`, [polygon])
+          return this;
+        }
         polygon = polygon.copy.reverse();
         let newMesh = new Mesh(polygon, [], this);
+
+        // Remove holes swallowed by new hole
+        let iInternalHole = this.holes.findIndex(hole => !polygon.contains(hole.bounds));
+        while (iInternalHole !== -1) {
+          log(`Removing smaller internal hole`, [this.holes.splice(iInternalHole, 1)])
+          iInternalHole = this.holes.findIndex(hole => !polygon.contains(hole.bounds));
+        }
+
         this.holes.push(newMesh);
         log(`Adding non-overlapped hole`, [polygon])
         return newMesh;

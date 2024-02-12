@@ -1,69 +1,132 @@
 import { Segment, Polygon, Point } from '../../node_modules/@harxer/geometry/geometry.js'
+import GraphEdge from './GraphEdge.js';
+import GraphTriangle from './GraphTriangle.js';
+import log from '../log.js'
+
+/** Graph traversal node wrapping a GraphTriangle node. */
+class PathNode {
+  constructor(graphTriangle) {
+    /** @type {Point} frontier - point towards destination */
+    this.frontier = undefined;
+    /** @type {GraphEdge} from - entry edge from previous polygon */
+    this.from = undefined;
+    /** @type {Number} cost - pathfinding heuristic value to reach this triangle */
+    this.cost = undefined;
+    /** @type {Number} priority - pathfinding queue pop modifier */
+    this.priority = undefined;
+    /** @type {GraphTriangle} graphTriangle - triangle and edge details */
+    this.graphTriangle = graphTriangle;
+  }
+}
 
 /**
  * Apply A* pathfinding to graph.
- * @param {[Polygon]} graph Edge joined array of polygons. Polygon edges hold references to neighboring polygons.
+ * @param {[GraphTriangle]} graph Edge joined array of polygons. Polygon edges hold references to neighboring polygons.
  * @param {Point} origin Start position
  * @param {Point} destination Goal position
  * @returns {[{point: Point, polygon: Polygon}]} shortest line segments through route
  */
 export default function getRoute(graph, origin, destination) {
-  // log(`Routing ${origin.logString()} to ${destination.logString()}`, [origin, destination], true)
+  log(`Routing ${origin.logString()} to ${destination.logString()}`, [origin, destination], true)
   let iOrigin = undefined
   let iDestination = undefined
 
-  // find origin and destination polygons
-  // TODO - optimize. Create sub-quadrants for faster start and destination resolution. Currently O(n)
+  // Find origin and destination polygons // TODO Can optimize. Sub-quadrants for faster start/destination resolution. Currently O(n)
   for (let i = 0; i < graph.length; i++) {
-    let polygon = graph[i]
+    let polygon = graph[i].triangle;
     if (iOrigin === undefined && polygon.containsPoint(origin)) iOrigin = i
     if (iDestination === undefined && polygon.containsPoint(destination)) iDestination = i
     if (iOrigin !== undefined && iDestination !== undefined) break
   }
-  if (iOrigin === undefined || iDestination === undefined) return []
+  if (iOrigin === undefined || iDestination === undefined) return {};
 
-  let nodes = graph.map(polygon => {
-    // From is the edge shared by previous polygon
-    return {frontier: undefined, from: undefined, cost: undefined, polygon: polygon, priority: undefined}
-  })
+  let nodes = graph.map(graphTriangle => new PathNode(graphTriangle));
 
+  const pathfinder = {
+
+    /** @type {[PathNode]} */
+    priorityStack: [],
+
+    get length() { return this.priorityStack.length },
+
+    /** Push a PathNode to priority stack. Optionally set priority on node. */
+    push(node, priority = undefined) {
+      if (this.priorityStack.indexOf(node) != -1) return // Skip if already in stack
+      if (priority !== undefined) node.priority = priority; // Update priority if needed
+      this.priorityStack.push(node)
+    },
+
+    /** TODO Optimize. Make queue - insert in priority rank. @returns {PathNode} */
+    pop() {
+      // Retrieve highest priority (lowest value) node
+      let { iNode } = this.priorityStack.reduce((lowest, { priority }, iNode) => {
+        if (priority === undefined) throw Error("Bad pathfinding logic. Node missing priority.");
+        if (priority < lowest.priority) return { priority, iNode };
+        return lowest;
+      }, {priority: Infinity})
+      // Pop from stack
+      let node = this.priorityStack.splice(iNode, 1)[0];
+      node.priority = undefined;
+      return node;
+    }
+  }
+
+  // Initialize origin node
   nodes[iOrigin].cost = 0
   nodes[iOrigin].frontier = origin
-  let pathfinder = [priorityNode(nodes[iOrigin], 0)]
+  pathfinder.push(nodes[iOrigin], 0)
 
+  let reachedDestination = false;
+
+  // Populate `from` on each node with cheapest route to destination graph triangle node
   while (pathfinder.length != 0) {
-    let current = popPriorityNode(pathfinder)
+    let current = pathfinder.pop();
 
-    if (current === nodes[iDestination]) break
+    if (current === nodes[iDestination]) {
+      reachedDestination = true;
+      break;
+    }
 
-    current.polygon.edges.forEach(edge => {
-      if (edge.peer === undefined) return
-      let next = nodes[graph.indexOf(edge.peer.parent)]
-      let frontier = edge.closestPointOnSegmentTo(current.frontier)
-      let cost = current.cost + Segment.distance(current.frontier, frontier) // TODO: edge cost is always 0
+    log(`    Processing node.`, [current.graphTriangle.triangle])
+
+    // Compute cost of crossing each shared graph edge into neighboring triangle
+    current.graphTriangle.edges.forEach(graphEdge => {
+      if (graphEdge.peer === undefined) return
+
+      let neighbor = nodes[graph.indexOf(graphEdge.peer.parent)]
+      let frontier = graphEdge.edge.closestPointOnSegmentTo(current.frontier)
+      let cost = current.cost + Segment.distance(current.frontier, frontier) // TODO: edge cost is always 0, can change this to distanceSqrd?
       // testLine(current.frontier, frontier)
-      // log(`        Frontier ${frontier.logString()} costs ${cost}`, [current.frontier, frontier, edge])
+      log(`        Edge cost ${cost}`, [current.frontier, frontier, graphEdge.edge]);
 
-      if (next.cost === undefined || cost < next.cost) {
-        next.cost = cost
-        next.frontier = frontier
-        // log("Set FROM for polygon.", [next.polygon, current.polygon.circumcenter])
-        next.from = {node: current, edge: edge.peer}
-        let priority = cost + Segment.distance(frontier, destination) // route heuristic
-        if (priority === undefined) throw "Pathfinding error. Failed to calculate priority."
-        pushPriorityNode(pathfinder, priorityNode(next, priority))
+      // Found cheaper route to node, update cost and frontier
+      if (neighbor.cost === undefined || cost < neighbor.cost) {
+        neighbor.cost = cost
+        neighbor.frontier = frontier
+        neighbor.from = graphEdge.peer;
+        let priority = cost + Segment.distance(frontier, destination) // Route heuristic
+        if (priority === undefined) throw Error("Pathfinding error. Failed to calculate priority.");
+        pathfinder.push(neighbor, priority);
       }
     })
   }
 
-  let current = nodes[iDestination]
-  let route = [{polygon: current.polygon, edge: undefined}]
-  while (current.from !== undefined) {
-    route.push({polygon: current.from.node.polygon, edge: current.from.edge})
-    current = current.from.node
+  if (!reachedDestination) {
+    console.error('Could not find path to destination.')
+    log('Could not find path to destination.')
   }
-  // log(`Route from ${origin.logString()} to ${destination.logString()}`, route.map(r => r.polygon))
-  return {path: createShortestPath(route.reverse(), origin, destination), route: route};
+
+  // Join path node `from` linked graph edges to form route
+  log(`Traversing route links.`);
+  let current = nodes[iDestination]
+  /** Graph triangle graph edges crossed to reach destination. @type {[GraphEdge]} */
+  let graphEdgeCrossings = [];
+  while (current.from !== undefined) {
+    graphEdgeCrossings.push(current.from.peer)
+    log(`    Processing node.`, [nodes[graph.indexOf(current.from.peer.parent)].graphTriangle.triangle]);
+    current = nodes[graph.indexOf(current.from.peer.parent)]; // TODO - indexOf can be replaced with `from` tracking the node index
+  }
+  return {path: createShortestPath(graphEdgeCrossings.reverse(), origin, destination), graphEdgeCrossings};
 }
 
 // ======== INTERNAL Helpers =========
@@ -108,24 +171,26 @@ function createPath(route, start, finish) {
  * Implementation described here: The Funnel Algorithm Explained
  * https://medium.com/@reza.teshnizi/the-funnel-algorithm-explained-visually-41e374172d2d
  */
-function createShortestPath(route, start, finish) {
+function createShortestPath(graphEdgeCrossings, start, finish) {
+  log(`Creating shortest path.`);
+
   let tail = [start] // {[Point]}
   let apex = () => tail[tail.length - 1] // latest tail point
   let left = [] // {[Point]}
   let right = [] // {[Point]}
   let boundaryIncludes = (boundary, point) => boundary.some(p => p.equals(point));
-  if (route.length == 1) return tail.concat(finish)
+  if (graphEdgeCrossings.length === 0) return tail.concat(finish)
 
   let COUNTERR = 0
-  routeEdges: for (let i = 0; i < route.length - 1; i++) {
+  routeEdges: for (let i = 0; i < graphEdgeCrossings.length; i++) {
     if (COUNTERR > 10) {
       // log("Break 2")
       return
     }
-    let edge = route[i].edge
-    let polygonCenter = route[i].polygon.circumcenter
+    let edge = graphEdgeCrossings[i].edge
+    let polygonCenter = graphEdgeCrossings[i].parent.triangle.circumcenter
     let exitSegment = new Segment(polygonCenter, edge.midpoint())
-    // log(`  Crossing ${edge.logString()}`, [exitSegment, edge])
+    log(`    Crossing ${edge.logString()}`, [exitSegment, edge])
 
     let lPoint, rPoint;
     // Check crossing-edge endpoint boundary-side
@@ -330,28 +395,4 @@ function routeHeuristic(a, b) {
   let x2 = b.polygon.circumcenter.x
   let y2 = b.polygon.circumcenter.y
   return Math.abs(x1 - x2) + Math.abs(y1 - y2)
-}
-
-function priorityNode(node, priority) {
-  if (priority === undefined)
-    throw "Pathfinding error. Failed to calculate priority."
-  node.priority = priority
-  return node
-}
-
-/// TODO - Optimize. Make queue
-function popPriorityNode(nodes) {
-  let lowest = {priority: undefined, node: undefined}
-  nodes.forEach(node => { // retrieve highest priority (lowest value) node
-    if (node.priority === undefined) throw "Bad pathfinding logic. Node should have priority set."
-    if (lowest.priority === undefined || node.priority < lowest.priority) lowest = {priority: node.priority, node: node}
-  })
-  let node = nodes.splice(nodes.indexOf(lowest.node), 1)[0] // pop from queue
-  node.priority = undefined
-  return node
-}
-
-function pushPriorityNode(pathfinder, node) {
-  if (pathfinder.indexOf(node) != -1) return
-  pathfinder.push(node)
 }

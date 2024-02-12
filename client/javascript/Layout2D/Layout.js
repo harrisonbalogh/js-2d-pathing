@@ -82,6 +82,12 @@ export function contextSelection(p) {
     if (meshContext.bounds.containsPoint(p)) {
       if (meshContext.parent !== undefined) {
         meshContext = meshContext.parent;
+        log(`Selected bounds`, [meshContext.bounds])
+      }
+    } else {
+      let graphTriangle = meshContext.triangulatedGraph.find(({triangle}) => triangle.containsPoint(p));
+      if (graphTriangle !== undefined) {
+        log(`Graph triangle ${graphTriangle.triangle.logString()}`, [graphTriangle.triangle])
       }
     }
   }
@@ -246,8 +252,9 @@ export function route(origin, destination, logged = true) {
   destination = meshContext.bounds.closestPointOutsideFrom(destination)
 
   meshContext.holes.forEach(hole => {
-    origin = hole.bounds.closestPointOutsideFrom(origin)
-    destination = hole.bounds.closestPointOutsideFrom(destination)
+    let reverseHole = hole.bounds.copy.reverse();
+    origin = reverseHole.closestPointOutsideFrom(origin)
+    destination = reverseHole.closestPointOutsideFrom(destination)
   })
 
   // move origin and destination outside of any blockers
@@ -259,8 +266,10 @@ export function route(origin, destination, logged = true) {
   routing = {origin: origin, destination: destination}
   let route = getRoute(getTriangulation(), origin, destination, logged)
 
-  let routePolygons = (route.route || []).map(r => r.polygon)
-  meshContext.triangulationPolygons.forEach(triangle => triangle.highlighted = routePolygons.includes(triangle))
+  let routePolygons = (route.graphEdgeCrossings || []).map(graphEdge => graphEdge.edge)
+  // TODO
+  // meshContext.triangulatedGraph.forEach({triangle} => triangle.highlighted = routePolygons.includes(triangle))
+  log('Got route', routePolygons)
 
   let pathBuilder = []
   for (let p = 1; p < (route.path || []).length; p++) {
@@ -278,21 +287,21 @@ function getTriangulation() {
     try {
       meshContext.setTriangulation(getTriangulatedGraph(meshContext.bounds, meshContext.holes.map(hole => hole.bounds.copy.reverse())))
     } catch(e) {
-      console.log(`No bridges ${e}`, e)
+      console.log(`No bridges. Error: ${e}`, e)
       meshContext.setTriangulation([]);
     }
-    log(`Triangles`, meshContext.triangulationPolygons)
+    log(`Triangles: ${meshContext.triangulatedGraph.length}`)
     if (routing !== undefined) route(routing.origin, routing.destination)
   }
 
-  return meshContext.triangulationPolygons
+  return meshContext.triangulatedGraph
 }
 
 export function renderTriangulation(context) {
   if (meshContext === undefined) return;
   getTriangulation()
 
-  meshContext.triangulationPolygons.forEach(polygon => {
+  meshContext.triangulatedGraph.forEach(({triangle: polygon}) => {
     context.strokeStyle = "rgba(50, 50, 200, 0.2)"
     context.fillStyle = "rgba(55, 55, 180, 0.1)"
     if (polygon.highlighted !== undefined && polygon.highlighted) {
@@ -306,21 +315,13 @@ export function renderTriangulation(context) {
     if (visibleTriangulation) context.stroke();
   });
 
-  pathfindingRoute.forEach(segment => {
-    context.strokeStyle = "rgb(50, 50, 50)"
-    context.fillStyle = "rgb(100, 100, 100)"
-
-    context.beginPath()
-    context.arc(segment.a.x, segment.a.y, 2, 0, 2 * Math.PI, false)
-    context.stroke()
-    context.beginPath()
-    context.arc(segment.b.x, segment.b.y, 2, 0, 2 * Math.PI, false)
-    context.fill()
-    context.beginPath()
-    context.moveTo(segment.a.x, segment.a.y)
-    context.lineTo(segment.b.x, segment.b.y)
-    context.stroke()
-  })
+  context.lineWidth = 3
+  context.strokeStyle = "rgb(255, 120, 0 )"
+  context.beginPath()
+  if (pathfindingRoute.length) context.moveTo(pathfindingRoute[0].a.x, pathfindingRoute[0].a.y)
+  pathfindingRoute.forEach(segment => context.lineTo(segment.b.x, segment.b.y))
+  context.stroke()
+  context.lineWidth = 1
 }
 
 /** Recursive JSON builder for layout meshes. */

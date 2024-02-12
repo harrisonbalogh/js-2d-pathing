@@ -1,6 +1,7 @@
-import { Segment, Vector, Polygon, orientation } from '../../node_modules/@harxer/geometry/geometry.js'
+import { Segment, Vector, Polygon, orientation, equals } from '../../node_modules/@harxer/geometry/geometry.js'
 import {optimizeTriangulation as optimize} from './Layout.js'
 import log from '../log.js';
+import GraphTriangle from './GraphTriangle.js';
 
 /** Controls threshold for graph optimization for conjoining triangles. */
 let TRIANGULATION_ANGLE_BOUND = (30) / 180 * Math.PI
@@ -11,7 +12,7 @@ const DEBUG = false;
  * Apply Delaunay triangulation to obtain an array of edge-sharing triangles.
  * @param {Polygon} boundsPolygon Polygon containing all holes for triangulation.
  * @param {[Polygon]} holePolygons Holes to be avoided when triangulating.
- * @returns {[Polygon]} an array of triangles
+ * @returns {[GraphTriangle]} an array of triangles
  */
 export default function getTriangulatedGraph(boundsPolygon, holePolygons) {
   if (DEBUG) log('Generating triangulation.', holePolygons, true)
@@ -58,12 +59,17 @@ export default function getTriangulatedGraph(boundsPolygon, holePolygons) {
 
     let cross = prevVector.crossProduct(nextVector)
 
-    if (cross <= 0 || Number.isNaN(cross)) {
+    const PRECISION_BUFFER = 10e3;
+    let largestAbsValue = PRECISION_BUFFER  * Math.max(Math.abs(prevVector.x * nextVector.y), Math.abs(prevVector.y * nextVector.x));
+
+    if (equals(cross + largestAbsValue, largestAbsValue) || cross <= 0 || Number.isNaN(cross)) {
       node.convex = false;
       node.eartip = false;
       if (DEBUG) log(`    Setting node data CROSS:${node.convex}`, [vPrev, v, vNext])
       return
     }
+
+    if (DEBUG) log(`    Setting node data. ${cross} from ${largestAbsValue} Cross: ${equals(cross + largestAbsValue, largestAbsValue)}, ori: ${orientation(vNext, v, vPrev)}`, [new Segment(vPrev, v), new Segment(v, vNext)])
 
     node.convex = true
     // Get angle between origin-shared vectors
@@ -72,7 +78,7 @@ export default function getTriangulatedGraph(boundsPolygon, holePolygons) {
     let triangle = new Polygon([vNext, v, vPrev]);
     node.eartip = graphBuilder.every(({vertex, convex}) => convex || vertex.equals(vPrev) || vertex.equals(v) || vertex.equals(vNext) || !triangle.containsPoint(vertex));
     // TODO verify `convex ||` above
-    if (DEBUG) log(`    Setting node data EAR:${node.eartip}`, [new Segment(vPrev, v), new Segment(v, vNext)])
+    if (DEBUG) log(`      ...EAR: ${node.eartip}`, [new Segment(vPrev, v), new Segment(v, vNext)])
   }
 
   // Connect holes to bounds using "bridge" segments to form one degenerate polygon
@@ -301,29 +307,26 @@ export default function getTriangulatedGraph(boundsPolygon, holePolygons) {
     setNodeData(undefined, iNode % graphBuilder.length);
   }
 
-  // Link overlapping edges
-  // for (let i = 0; i < triangles.length; i++) {
-  //   let polygon = triangles[i]
-  //   for (let p = 0; p < triangles.length; p++) {
-  //     if (i == p) continue
-  //     let peerPolygon = triangles[p]
-  //     polygon.edges.forEach(edge => {
-  //       if (edge.peer !== undefined) return
-  //       peerPolygon.edges.forEach(peerEdge => {
-  //         if (peerEdge.peer !== undefined) return
-  //         if (edge.equals(peerEdge.flip())) {
-  //           edge.peer = peerEdge
-  //           peerEdge.peer = edge
-  //           // optional: additional preprocessing to store the segment distances
-  //           edge.distance()
-  //           peerEdge.distance()
-  //         }
-  //       })
-  //     })
-  //   }
-  // }
+  let graph = triangles.map(triangle => new GraphTriangle(triangle))
+  graph.forEach((node, iNode) => {
+
+    // Link overlap edges
+    node.edges.forEach(graphEdge => {
+      let overlapGraphEdge;
+      for (let iPeerNode = 0; iPeerNode < graph.length; iPeerNode++) {
+        if (iNode === iPeerNode) continue;
+        overlapGraphEdge = graph[iPeerNode].edges.find(({edge: peerEdge}) => graphEdge.edge.equals(peerEdge.copy.flip()));
+        if (overlapGraphEdge) break;
+      }
+
+      if (overlapGraphEdge === undefined) return;
+      graphEdge.linkEdge(overlapGraphEdge);
+    })
+
+    return node;
+  })
   if (DEBUG) log(`Created triangles: ${triangles.length}.`, triangles);
-  return triangles
+  return graph;
 }
 
 // ======== INTERNAL Helpers =========
