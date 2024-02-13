@@ -1,19 +1,19 @@
-import { Point } from '../node_modules/@harxer/geometry/geometry.js'
-import Layout from './Layout2D/Layout.js'
-import * as LayoutManager from './Layout2D/tools/LayoutManager.js'
+import { Point } from '@harxer/geometry'
+import Layout from '@harxer/engine-2d/helpers/layout/Layout.js'
+import * as LayoutManager from '@harxer/engine-2d/helpers/layout/tools/LayoutManager.js'
 import { renderLogData, disableLogging, selectLogNext, selectLogPrev, attachLogOut } from './log.js'
 import log, { clear as clearConsole } from './log.js'
+import * as TickClock from '@harxer/engine-2d/core/TickClock.js'
 
 // ==================================================================================================================== Variables =====
-const RENDER_HERTZ = 1000 / 60 // Render update speed
 const RENDER_SCALING = 2
+const RENDER_HERTZ = 60 / 1000
 const view = {
   x: 0,
   y: 0
 }
 
 let canvasRunning = true // when the GUI setting is enabled or not. Override drawing.
-let canvasUpdating = false // if update has yet to resume
 let canvasFlush = true // if drawing frames are cleared or retained
 let canvas_bg = document.getElementById("bgCanvas")
 let canvasMasterContext = canvas_bg.getContext('2d') // The primary canvas particles are drawn on
@@ -97,8 +97,7 @@ document.addEventListener('mouseup', e => {
 // --------------
 
 function toggleCanvasRunning() {
-  canvasRunning = !canvasRunning
-  if (!canvasUpdating && canvasRunning) update()
+  TickClock.running() ? TickClock.stop() : TickClock.resume();
 }
 function toggleMouseLabel() {
   mouseLabelsVisible = !mouseLabelsVisible
@@ -241,18 +240,8 @@ function renderTestShapes() {
 }
 
 // ======================================================================================================================== Clock =====
-window.requestAnimFrame =
-    window.requestAnimationFrame ||
-    window.webkitRequestAnimationFrame ||
-    window.mozRequestAnimationFrame ||
-    window.oRequestAnimationFrame ||
-    window.msRequestAnimationFrame ||
-    function (callback) {
-      window.setTimeout(callback, RENDER_HERTZ);
-  };
 
-function update(delta) {
-  canvasUpdating = true
+function render() {
   if (canvasFlush) {
     canvasMasterContext.clearRect(-view.x, -view.y, canvas_bg.width, canvas_bg.height)
   }
@@ -262,9 +251,6 @@ function update(delta) {
   if (contentOutScrolling) contentOut.scrollTop += CONTENT_OUT_SCROLL_SPEED
 
   renderTestShapes()
-
-  if (canvasRunning) window.requestAnimFrame(update)
-  else canvasUpdating = false
 }
 
 // ======================================================================================================================= Window Setup =====
@@ -331,6 +317,7 @@ canvas_bg.onmousedown = e => {
   } else if (mouse.tool === MOUSE_TOOL.POINTER) {
 
     if (e.button === 0) { // Left click
+      console.log(`Loc:`, mouse.contextLoc)
       layout2D.contextSelection(mouse.contextLoc);
     } else { // Right click
       canvasMouseDragging = 2;
@@ -428,5 +415,7 @@ function homeRefit() {
 {
   homeRefit()
   LayoutManager.initLayout().then(layout => layout2D = layout);
-  update()
+
+  TickClock.addInterval('render', render, RENDER_HERTZ)
+  TickClock.start()
 }

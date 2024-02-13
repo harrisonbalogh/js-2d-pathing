@@ -1,5 +1,5 @@
-import { Segment, Vector, Polygon, Point } from '../node_modules/@harxer/geometry/geometry.js'
-import Mesh from './Layout2D/Mesh.js'
+import { Segment, Vector, Polygon, Point } from '@harxer/geometry'
+import Mesh from '@harxer/engine-2d/helpers/layout/Mesh.js'
 
 let logData = []
 let logSelected = undefined
