@@ -30,7 +30,7 @@ export function clear() {
 
 /**
  * Text is required and will be placed into the output list in its own list item.
- * Optional parameter 'data' can be an array with segments, points, vectors, rays, polygons, and blockers.
+ * Optional parameter 'data' can be an array with segments, points, vectors, rays, and polygons.
  * Passing true or false into the optional 'flush' argument will clear all output before printing the text.
  */
 export default function log(text, data, flush) {

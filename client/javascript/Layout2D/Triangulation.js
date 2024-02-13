@@ -1,5 +1,5 @@
 import { Segment, Vector, Polygon, orientation, equals } from '../../node_modules/@harxer/geometry/geometry.js'
-import {optimizeTriangulation as optimize} from './Layout.js'
+// import {optimizeTriangulation as optimize} from './Layout.js'
 import log from '../log.js';
 import GraphTriangle from './GraphTriangle.js';
 
@@ -14,7 +14,7 @@ const DEBUG = false;
  * @param {[Polygon]} holePolygons Holes to be avoided when triangulating.
  * @returns {[GraphTriangle]} an array of triangles
  */
-export default function getTriangulatedGraph(boundsPolygon, holePolygons) {
+export default function triangulateGraph(boundsPolygon, holePolygons) {
   if (DEBUG) log('Generating triangulation.', holePolygons, true)
   if (boundsPolygon === undefined) return []
 
@@ -239,7 +239,7 @@ export default function getTriangulatedGraph(boundsPolygon, holePolygons) {
     // Triangulation degenerate polygon is CCW. Vertices are flipped here to form CW polygon
     let triangle = new Polygon([vNext, v, vPrev])
 
-    if (false && optimize) {
+    if (false) { // skip optimize
       let optimizeVertices = [
         {angle: triangle.interiorAngleVertex(0), oppositeEdge: triangle.edges[1]},
         {angle: triangle.interiorAngleVertex(1), oppositeEdge: triangle.edges[2]},

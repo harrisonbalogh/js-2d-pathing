@@ -26,7 +26,7 @@ class PathNode {
  * @param {Point} destination Goal position
  * @returns {[{point: Point, polygon: Polygon}]} shortest line segments through route
  */
-export default function getRoute(graph, origin, destination) {
+export default function route(graph, origin, destination) {
   log(`Routing ${origin.logString()} to ${destination.logString()}`, [origin, destination], true)
   let iOrigin = undefined
   let iDestination = undefined

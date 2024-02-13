@@ -1,6 +1,6 @@
-import './Layout2D/Error.js'
 import { Point } from '../node_modules/@harxer/geometry/geometry.js'
-import * as Layout from './Layout2D/Layout.js'
+import Layout from './Layout2D/Layout.js'
+import * as LayoutManager from './Layout2D/tools/LayoutManager.js'
 import { renderLogData, disableLogging, selectLogNext, selectLogPrev, attachLogOut } from './log.js'
 import log, { clear as clearConsole } from './log.js'
 
@@ -17,6 +17,8 @@ let canvasUpdating = false // if update has yet to resume
 let canvasFlush = true // if drawing frames are cleared or retained
 let canvas_bg = document.getElementById("bgCanvas")
 let canvasMasterContext = canvas_bg.getContext('2d') // The primary canvas particles are drawn on
+/** @type {Layout} */
+let layout2D = undefined;
 
 const MOUSE_TOOL = {
   POINTER: 0,
@@ -43,12 +45,6 @@ let meshEraserToolActive = false; // TODO NYI
 /** 0 - no mouse drag, 1 - left mouse drag, 2 - right mouse drag */
 let canvasMouseDragging = 0;
 
-let parallelBarsVisible = false;
-let parallelBarDragging = {top: false, left: false}
-const PARALLEL_SETTER_TOP_X = 80
-const PARALLEL_SETTER_TOP_Y = 14
-const PARALLEL_SETTER_TOP_H = 20
-
 canvas_bg.width = RENDER_SCALING * canvas_bg.offsetWidth;
 canvas_bg.height = RENDER_SCALING * canvas_bg.offsetHeight;
 
@@ -59,7 +55,7 @@ const SETTING_TOGGLE_ELEMENTS_MAP = {
   'setting-item-smearToggle': toggleSmearRendering,
   // Triangulate settings
   'setting-item-triangulate-highlight-edges': toggleTriangulateHighlightEdges,
-  'setting-item-triangulate-optimize-pass': toggleTriangulateOptimizationPass,
+  'setting-item-triangulate-optimize-pass': _ => {},
   // 'setting-item-randomizerToggle': toggleRandomizer
 }
 Object.keys(SETTING_TOGGLE_ELEMENTS_MAP).forEach(
@@ -110,36 +106,27 @@ function toggleMouseLabel() {
 function toggleSmearRendering() {
   canvasFlush = !canvasFlush
 }
-// function toggleRandomizer() {
-//   mouseRandomizer.enabled = !mouseRandomizer.enabled;
-//   disableLogging(mouseRandomizer.enabled)
-//   clearTimeout(mouseRandomizer.clock);
-//   if (mouseRandomizer.enabled) mouseRandomizer.randomizeMousePoint();
-// }
-function toggleTriangulateOptimizationPass(e) {
-  Layout.triangulationOptimized(!Layout.optimizeTriangulation)
-}
 
 function toggleTriangulateHighlightEdges(e) {
-  Layout.triangulationVisible(!Layout.visibleTriangulation)
-}
-function resetLayout() {
-  Layout.reset()
+  LayoutManager.triangulationVisible(!LayoutManager.visibleTriangulation)
 }
 document.getElementById('modal-layout-load-close').addEventListener('click', _ => {
   document.getElementById('modal-layout-load').style.display = 'none';
 })
 document.getElementById('modal-layout-button-load').addEventListener('click', _ => {
   let inputElement = document.getElementById('modal-layout-load-input');
-  Layout.parseLayout(inputElement.value)
+  layout2D = Layout.fromJson(inputElement.value);
   inputElement.value = '';
   document.getElementById('modal-layout-load').style.display = 'none';
 })
 function loadLayout() {
   document.getElementById('modal-layout-load').style.display = 'block';
 }
+function resetLayout() {
+  LayoutManager.reloadDefaultLayout().then(layout => layout2D = layout);
+}
 function printLayout() {
-  log(Layout.serialized())
+  log(layout2D.serialized())
   if (mouse.tool === MOUSE_TOOL.PATHER) {
     log(`Left mouse: ${mouse.lastLeftClick?.logString()}. Right mouse: ${mouse.lastRightClick?.logString()}`)
   }
@@ -198,32 +185,6 @@ contentOut.onscroll = () => {
   }
 }
 
-// const RANDOMIZER_HERTZ = 0.01 * 1000;
-// let mouseRandomizer = {
-//   clock: null,
-//   enabled: false,
-//   lastSideChosen: 0,
-//   randomizeMousePoint: () => {
-//     if (!mouseRandomizer.enabled || Layout.bounds.blocker === undefined) return
-
-//     let w = Layout.bounds.width, h = Layout.bounds.height, x = Layout.bounds.xInset, y = Layout.bounds.yInset
-
-//     mouseRandomizer.lastSideChosen = (mouseRandomizer.lastSideChosen + 1 + Math.floor(Math.random() * 2)) % 4;
-//     mouse.loc = new Point(Math.floor(Math.random() * w), Math.floor(Math.random() * h))
-
-//     if (mouseRandomizer.lastSideChosen == 0) mouse.loc.y = x + 2
-//     else if (mouseRandomizer.lastSideChosen == 1) mouse.loc.x = w
-//     else if (mouseRandomizer.lastSideChosen == 2) mouse.loc.y = h
-//     else if (mouseRandomizer.lastSideChosen == 3) mouse.loc.x = y + 2
-//     mouse.lastLeftClick = new Point(mouse.lastRightClick.x, mouse.lastRightClick.y);
-//     mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
-
-//     Layout.route(mouse.lastLeftClick, mouse.lastRightClick)
-
-//     mouseRandomizer.clock = setTimeout(() => { mouseRandomizer.randomizeMousePoint(); }, RANDOMIZER_HERTZ);
-//   }
-// }
-
 function testLine(a, b, flush = false) {
   if (flush) test_lines = []
   test_lines.push( {a: a, b: b, color: "rgb(44,54,64)"} );
@@ -272,40 +233,6 @@ function renderTestShapes() {
     canvasMasterContext.stroke();
     canvasMasterContext.lineWidth = 1;
   }
-  if (parallelBarsVisible) {
-    let h = PARALLEL_SETTER_TOP_H;
-    let x = Layout.bounds.xInset + PARALLEL_SETTER_TOP_X;
-    let y = Layout.bounds.yInset + PARALLEL_SETTER_TOP_Y;
-    canvasMasterContext.strokeStyle = "rgb(44,54,64)";
-    // Top Setter
-    canvasMasterContext.beginPath();
-    canvasMasterContext.moveTo(x, y);
-    canvasMasterContext.lineTo(Layout.bounds.width-x, y);
-    canvasMasterContext.arc(Layout.bounds.width-x, y+h/2, h/2, -Math.PI/2, Math.PI/2, false);
-    canvasMasterContext.lineTo(x, y+h);
-    canvasMasterContext.arc(x, y+h/2, h/2, Math.PI/2, -Math.PI/2, false);
-    canvasMasterContext.stroke();
-    if (parallelBarDragging.top) {
-      canvasMasterContext.fillStyle = "rgb(44,54,64)";
-      canvasMasterContext.beginPath();
-      canvasMasterContext.arc(mouse.lastRightClick.x, y+h/2, h/2, 0, Math.PI*2, false);
-      canvasMasterContext.fill();
-    }
-    // Left Setter
-    canvasMasterContext.beginPath();
-    canvasMasterContext.moveTo(y, x);
-    canvasMasterContext.lineTo(y, Layout.bounds.width-x);
-    canvasMasterContext.arc(y+h/2, Layout.bounds.width-x, h/2, Math.PI, 0, true);
-    canvasMasterContext.lineTo(y+h, x);
-    canvasMasterContext.arc(y+h/2, x, h/2, 0, -Math.PI, true);
-    canvasMasterContext.stroke();
-    if (parallelBarDragging.left) {
-      canvasMasterContext.fillStyle = "rgb(44,54,64)";
-      canvasMasterContext.beginPath();
-      canvasMasterContext.arc(y+h/2, mouse.lastRightClick.y, h/2, 0, Math.PI*2, false);
-      canvasMasterContext.fill();
-    }
-  }
   canvasMasterContext.strokeStyle = "rgb(20, 180, 20)";
   canvasMasterContext.fillStyle = "rgb(20, 180, 20)";
   canvasMasterContext.font = '16px sans-serif';
@@ -330,8 +257,8 @@ function update(delta) {
     canvasMasterContext.clearRect(-view.x, -view.y, canvas_bg.width, canvas_bg.height)
   }
 
-  Layout.constructionRender(canvasMasterContext)
-  Layout.renderTriangulation(canvasMasterContext)
+  LayoutManager.constructionRender(canvasMasterContext)
+  LayoutManager.renderTriangulation(layout2D, canvasMasterContext)
   if (contentOutScrolling) contentOut.scrollTop += CONTENT_OUT_SCROLL_SPEED
 
   renderTestShapes()
@@ -390,23 +317,21 @@ canvas_bg.onmousedown = e => {
   if (mouse.tool === MOUSE_TOOL.MESH_CONSTRUCTOR) {
 
     if (e.button === 0) {  // Left click add vertex or finish mesh if closed shape
-      Layout.addConstructionPoint(mouse.contextLoc);
-    } else { // Right click take back last constructor vertex or erase if no construction in progress
-      if (Layout.hasConstructorVertices()) {
-        Layout.undoConstructionPoint();
-      } else {
-        Layout.deleteMeshUnderPoint(mouse.contextLoc);
-      }
+      LayoutManager.addConstructionPoint(layout2D, mouse.contextLoc);
+    } else { // Right click take back last constructor vertex
+      LayoutManager.undoConstructionPoint();
     }
 
   } else if (mouse.tool === MOUSE_TOOL.MESH_ERASER) {
 
-    Layout.deleteMeshUnderPoint(mouse.contextLoc);
+    if (layout2D.deleteMeshUnderPoint(mouse.contextLoc)) {
+      LayoutManager.writeLayout(layout2D);
+    }
 
   } else if (mouse.tool === MOUSE_TOOL.POINTER) {
 
     if (e.button === 0) { // Left click
-      Layout.contextSelection(mouse.contextLoc);
+      layout2D.contextSelection(mouse.contextLoc);
     } else { // Right click
       canvasMouseDragging = 2;
     }
@@ -427,7 +352,9 @@ canvas_bg.onmousedown = e => {
     }
 
     if (mouse.lastLeftClick && mouse.lastRightClick) {
-      Layout.route(contextLeftMouse, contextRightMouse);
+      LayoutManager.setPathfindingRoute(
+        layout2D.contextRoute(contextLeftMouse, contextRightMouse)
+      );
     }
 
   }
@@ -463,7 +390,13 @@ canvas_bg.onmousemove = e => {
       testCircle(contextLeftMouse.x, contextLeftMouse.y, 6, true)
       testCircle(contextRightMouse.x, contextRightMouse.y, 6)
 
-      Layout.route(contextLeftMouse, contextRightMouse);
+      LayoutManager.setPathfindingRoute(
+        layout2D.contextRoute(contextLeftMouse, contextRightMouse)
+      );
+    }
+  } else {
+    if (mouse.tool === MOUSE_TOOL.MESH_CONSTRUCTOR) {
+      LayoutManager.constructionMouseMoveHandler(mouse.contextLoc.x, mouse.contextLoc.y)
     }
   }
 }
@@ -491,8 +424,9 @@ function homeRefit() {
 }
 
 // ======================================================================================================================= Launch =====
+
 {
   homeRefit()
-  Layout.load()
+  LayoutManager.initLayout().then(layout => layout2D = layout);
   update()
 }

@@ -1,5 +1,6 @@
 import log from '../log.js'
 import { Polygon } from '../../node_modules/@harxer/geometry/geometry.js';
+import triangulateGraph from './Triangulation.js'
 
 /**
  * Provides convenience construction and render methods for polygons. Pathfinding will use the global
@@ -12,31 +13,31 @@ export default class Mesh {
     this.bounds = polygon;
     /** @type {[Mesh]} */
     this.holes = holes;
-    /** @type {boolean} */
-    this._needsTriangulation = true;
-    /** @type {[GraphTriangle]} */
-    this.triangulatedGraph = [];
     /** @type {Mesh} */
     this.parent = parent;
+
+    /** Set to undefined if needs new triangulation compute, else array. */
+    this._triangulatedGraph = undefined;
   }
 
+  /** Flag mesh for new triangulation compute on next graph array retrieval. */
   needsTriangulation() {
-    this._needsTriangulation = true;
-    this.triangulatedGraph = [];
+    this._triangulatedGraph = undefined;
   }
 
-  setTriangulation(polygons) {
-    this._needsTriangulation = false;
-    this.triangulatedGraph = polygons;
+  /** @returns {[GraphTriangle]} */
+  get triangulatedGraph() {
+    if (this._triangulatedGraph !== undefined) return this._triangulatedGraph;
+    try {
+      this._triangulatedGraph = triangulateGraph(
+        this.bounds,
+        this.holes.map(hole => hole.bounds.copy.reverse())
+      )
+    } catch(e) {
+      console.log(`No bridges. Error: ${e}`, e)
+      this._triangulatedGraph = [];
+    }
   }
-
-  // vertices() {
-  //   return this.polygon.vertices
-  // }
-
-  // edges() {
-  //   return this.polygon.edges
-  // }
 
   render(context) {
     // Draw originalVertices
@@ -63,10 +64,12 @@ export default class Mesh {
     let self = this;
     // Check overlap
     if (this.bounds.overlaps(polygon)) {
+      this.needsTriangulation();
       // CCW polygon subtract from bounds, CW union
       this.bounds = this.bounds.union(polygon);
       log(`Union bounds`, [polygon, this.bounds])
     } else if (polygon.counterclockwise && polygon.vertices.some(vertex => !self.bounds.containsPoint(vertex))) {
+      this.needsTriangulation();
       // Internal contained polygons become holes
       let newMesh;
       let iOverlappedHole = this.holes.findIndex(hole => hole.bounds.overlaps(polygon));
@@ -120,5 +123,16 @@ export default class Mesh {
     log(`Adding hole`, [polygon])
     return this;
     // Ignore non-overlapping counterclockwise polygons
+  }
+
+  /** Removes hole from mesh if hit by given point. @param {Point} p @returns true if removed a hole  */
+  removeHoleUnderPoint(p) {
+    let iHoleCollision = this.holes.findIndex(hole => !hole.bounds.containsPoint(p))
+    if (iHoleCollision > -1) {
+      this.holes.splice(iHoleCollision, 1);
+      this.needsTriangulation();
+      return true;
+    }
+    return false;
   }
 }
