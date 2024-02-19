@@ -7,7 +7,7 @@ import * as TickClock from '@harxer/engine-2d/core/TickClock.js'
 
 // ==================================================================================================================== Variables =====
 const RENDER_SCALING = 2
-const RENDER_HERTZ = 60
+const RENDER_HERTZ = 30
 const view = {
   x: 0,
   y: 0
