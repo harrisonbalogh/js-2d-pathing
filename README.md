@@ -1,7 +1,7 @@
 # js-2d-pathing
 ## Delaunay triangulation, gridifying, A* pathfinding, funnel algorithm
 
-<iframe width="700" height="394" src="https://www.youtube.com/embed/VC3mHaZeFlc" title="YouTube video player" frameborder="0" allow="clipboard-write; encrypted-media; picture-in-picture" allowfullscreen /> 
+<iframe width="700" height="394" src="https://www.youtube.com/embed/VC3mHaZeFlc" title="YouTube video player" frameborder="0" allow="clipboard-write; encrypted-media; picture-in-picture" allowfullscreen />
 
 ##
 
@@ -21,11 +21,6 @@ funnel algorithm implementation (in [Pathfinding.js](https://github.com/harrison
 
 Fill outside of bounding polygon with another fill color without using canvas clip(). Too expensive.
 
-Polygon-context. A bounding polygon's holes should serve as its layout pathing space.
-Each hole should then serve as the bounding space for more internal holes - and should
-continue recursively in this fashion to form a tree. When considering pathing, the
-bounding polygon should be any polygon and its holes should function as the blockers.
-
 Decide how to handle overlapping CW with CCW polygons.
 
 ---
@@ -37,7 +32,9 @@ Run following within /site directory:
 Python2:
 > python -m SimpleHTTPServer 8000
 
-Python3: 
+Python3:
 > python3 -m http.server --cgi 8080
+
+Shortcut: `npm run start`
 
 Check Mac python version with `python --version`
