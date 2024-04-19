@@ -21,10 +21,16 @@ canvas {
   bottom: 10px;
   display: flex;
   flex-direction: column;
+  overflow-y: hidden;
   position: absolute;
   right: 10px;
   top: 10px;
   width: 260px;
+}
+
+#dev-pane.hidden {
+  border-radius: 14px;
+  height: 38px;
 }
 
 /* - - - - - - - - - CONTROLS - - - - - - - - - */
@@ -34,7 +40,7 @@ canvas {
   cursor: default;
   flex-shrink: 0;
   list-style: none;
-  height: 50%;
+  height: 75%;
   overflow-y: auto;
   margin: 0;
   padding: 0;
@@ -48,6 +54,10 @@ canvas {
   padding: 4px;
   margin: 6px 0 0 0;
   padding-bottom: 0;
+}
+
+#dev-pane-controls-settings.hidden {
+  height: 38px;
 }
 
 .controls-settings li {

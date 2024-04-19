@@ -13,7 +13,6 @@ const view = {
   y: 0
 }
 
-let canvasRunning = true // when the GUI setting is enabled or not. Override drawing.
 let canvasFlush = true // if drawing frames are cleared or retained
 let canvas_bg = document.getElementById("bgCanvas")
 let canvasMasterContext = canvas_bg.getContext('2d') // The primary canvas particles are drawn on
@@ -34,14 +33,11 @@ export let mouse = {
   tool: MOUSE_TOOL.POINTER,
   get contextLoc() {
     return new Point(this.loc.x - view.x, this.loc.y - view.y)
-  }
+  },
+  labelVisible: false
 }
 // Set default toolbox selection to pointer
 document.getElementById('settings-item-toolbox-pointer').className = 'active';
-let mouseLabelsVisible = true;
-
-let meshConstructorToolActive = false;
-let meshEraserToolActive = false; // TODO NYI
 /** 0 - no mouse drag, 1 - left mouse drag, 2 - right mouse drag */
 let canvasMouseDragging = 0;
 
@@ -55,13 +51,13 @@ const SETTING_TOGGLE_ELEMENTS_MAP = {
   'setting-item-smearToggle': toggleSmearRendering,
   // Triangulate settings
   'setting-item-triangulate-highlight-edges': toggleTriangulateHighlightEdges,
-  'setting-item-triangulate-optimize-pass': _ => {},
-  // 'setting-item-randomizerToggle': toggleRandomizer
+  'setting-item-triangulate-optimize-pass': _ => {}
 }
 Object.keys(SETTING_TOGGLE_ELEMENTS_MAP).forEach(
   elemId => document.getElementById(elemId).addEventListener('click', e => {
     e.target.classList.toggle("active");
     SETTING_TOGGLE_ELEMENTS_MAP[elemId](e);
+    e.preventDefault();
   })
 )
 
@@ -70,10 +66,13 @@ const SETTING_BUTTON_ELEMENTS_MAP = {
   'setting-item-mesh-load': loadLayout,
   'setting-item-mesh-print': printLayout,
   'setting-item-console-clear': clearConsole,
+  'setting-item-randomPath': randomPath,
+  'setting-item-hide-control-window': hideControlWindow
 }
 Object.keys(SETTING_BUTTON_ELEMENTS_MAP).forEach(
   elemId => document.getElementById(elemId).addEventListener('click', e => {
     SETTING_BUTTON_ELEMENTS_MAP[elemId](e);
+    e.preventDefault();
   })
 )
 
@@ -100,10 +99,19 @@ function toggleCanvasRunning() {
   TickClock.running() ? TickClock.stop() : TickClock.resume();
 }
 function toggleMouseLabel() {
-  mouseLabelsVisible = !mouseLabelsVisible
+  mouse.labelVisible = !mouse.labelVisible
 }
 function toggleSmearRendering() {
   canvasFlush = !canvasFlush
+}
+function randomPath() {
+  let { point: p1 } = layout2D.meshContext.getRandomPoint();
+  let { point: p2 } = layout2D.meshContext.getRandomPoint();
+  testCircle(p1.x, p1.y, 6, true)
+  testCircle(p2.x, p2.y, 6)
+  LayoutManager.setPathfindingRoute(
+    layout2D.contextRoute(p1, p2)
+  );
 }
 
 function toggleTriangulateHighlightEdges(e) {
@@ -118,6 +126,15 @@ document.getElementById('modal-layout-button-load').addEventListener('click', _ 
   inputElement.value = '';
   document.getElementById('modal-layout-load').style.display = 'none';
 })
+function hideControlWindow(e) {
+  if (document.getElementById('dev-pane').classList.contains("hidden")) {
+    e.target.innerHTML = "Minimize Dev Pane";
+  } else {
+    e.target.innerHTML = "Maximize Dev Pane";
+  }
+  document.getElementById('dev-pane').classList.toggle("hidden");
+  document.getElementById('dev-pane-controls-settings').classList.toggle("hidden");
+}
 function loadLayout() {
   document.getElementById('modal-layout-load').style.display = 'block';
 }
@@ -216,7 +233,7 @@ function renderTestShapes() {
     canvasMasterContext.arc(point.x, point.y, 4, 0, 2 * Math.PI, false);
     canvasMasterContext.fill();
   })
-  if (mouseLabelsVisible) {
+  if (mouse.labelVisible) {
     canvasMasterContext.fillStyle = "black"
     canvasMasterContext.font = '20px sans-serif';
     canvasMasterContext.fillText(mouse.contextLoc.x+', '+mouse.contextLoc.y, mouse.contextLoc.x+5, mouse.contextLoc.y-5);
@@ -351,7 +368,6 @@ canvas_bg.onmousedown = e => {
 
 canvas_bg.onmousemove = e => {
   e.preventDefault()
-  if (!canvasRunning) return
   let rect = canvas_bg.getBoundingClientRect();
   mouse.loc = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top))
 
@@ -414,8 +430,15 @@ function homeRefit() {
 
 {
   homeRefit()
-  LayoutManager.initLayout().then(layout => layout2D = layout);
+  LayoutManager.setLayoutCookieKey('js-2d-pathing-layout')
+  LayoutManager.setDefaultJsonLayoutUrl('layout_default.json')
+  layout2D = new Layout();
+  LayoutManager.initLayout().then(layout => {
+    layout2D = layout;
+  });
 
   TickClock.addInterval('render', render, RENDER_HERTZ)
   TickClock.start()
+
+  document.getElementById('setting-item-hide-control-window').click();
 }

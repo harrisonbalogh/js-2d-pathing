@@ -113,7 +113,7 @@ export function renderLogData(context) {
       data = new Point(data.x(), data.y())
     }
 
-    if (data instanceof Segment) {
+    if (Segment.typeOf(data)) {
       context.beginPath()
       context.arc(data.a.x, data.a.y, 4, 0, 2 * Math.PI, false)
       context.stroke()
@@ -127,7 +127,7 @@ export function renderLogData(context) {
       context.fillText(`${i}: ${data.a.logString()}`, data.a.x+5, data.a.y - 5)
       context.fillText(data.b.logString(), data.b.x+5, data.b.y - 5)
     } else
-    if (data instanceof Point) {
+    if (Point.typeOf(data)) {
       context.beginPath();
       context.arc(data.x, data.y, 4, 0, 2 * Math.PI, false);
       context.fill();

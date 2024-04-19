@@ -9,11 +9,9 @@
     "build": "webpack --config webpack.config.cjs --mode development",
     "start": "python3 -m http.server --cgi 8080"
   },
-  "dependencies": {
-    "@harxer/engine-2d": "^1.2.16",
-    "@harxer/geometry": "^1.2.2"
-  },
   "devDependencies": {
+    "@harxer/engine-2d": "^1.2.3",
+    "@harxer/geometry": "^1.2.3",
     "webpack": "^5.90.1",
     "webpack-cli": "^5.1.4"
   }
