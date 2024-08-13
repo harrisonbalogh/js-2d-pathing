@@ -1,9 +1,27 @@
 import { Segment, Vector, Polygon, Point } from '@harxer/geometry'
+// import { Segment, Vector, Polygon, Point } from '../node_modules/@harxer/engine-2d/node_modules/@harxer/geometry/geometry.js'
 import Mesh from '@harxer/engine-2d/helpers/layout/Mesh.js'
+import { Circle } from './index.js'
 
 let logData = []
 let logSelected = undefined
+function setLogSelected(log) {
+  logSelected = log;
+  notifiers.forEach(notifier => notifier());
+}
 let loggingDisabled = false
+export let textLabels = false;
+export function toggleTextLabels(val) {
+  if (val !== undefined) {
+    textLabels = val;
+  } else {
+    textLabels = !textLabels;
+  }
+}
+let notifiers = [];
+export function addLogSelectedNotifier(callback) {
+  notifiers.push(callback);
+}
 /**
  * Override logging globally. Useful for capturing logs under a certain condition.
  */
@@ -23,7 +41,7 @@ export function attachLogOut(list_element) {
 
 export function clear() {
   if (!contentOut) throw 'Logging was not configured with a list element with setup() call'
-  logSelected = undefined
+  setLogSelected(undefined);
   contentOut.innerHTML = "";
   logData = []
 }
@@ -49,14 +67,17 @@ export default function log(text, data, flush) {
 
   li.innerHTML = text;
   li.onmouseenter = () => {
-    if (logSelected === undefined) logData = data
+    if (logSelected === undefined) {
+      logData = data
+      notifiers.forEach(notifier => notifier());
+    }
   }
   li.onmousedown = () => {
     if (logSelected !== undefined) logSelected.style.backgroundColor = ""
-    if (li === logSelected) logSelected = undefined
+    if (li === logSelected) setLogSelected(undefined);
     else {
       logData = data
-      logSelected = li
+      setLogSelected(li);
       logSelected.style.backgroundColor = "darkgray"
     }
   }
@@ -64,12 +85,13 @@ export default function log(text, data, flush) {
     if (logSelected === undefined) logData = []
   }
   if (flush) {
-    logSelected = undefined
+    setLogSelected(undefined);
     contentOut.innerHTML = "";
     logData = []
   }
   contentOut.appendChild(li);
   // console.log(text)
+  // contentOut
 }
 
 const getLogSelectedIndex = () => {
@@ -109,10 +131,9 @@ export function renderLogData(context) {
     if (data instanceof Mesh) {
       data = data.polygon
     } else
-    if (data instanceof Vector) {
-      data = new Point(data.x(), data.y())
-    }
-
+    // if (data instanceof Vector) {
+    //   data = new Point(data.x(), data.y())
+    // }
     if (Segment.typeOf(data)) {
       context.beginPath()
       context.arc(data.a.x, data.a.y, 4, 0, 2 * Math.PI, false)
@@ -124,14 +145,29 @@ export function renderLogData(context) {
       context.moveTo(data.a.x, data.a.y)
       context.lineTo(data.b.x, data.b.y)
       context.stroke()
-      context.fillText(`${i}: ${data.a.logString()}`, data.a.x+5, data.a.y - 5)
-      context.fillText(data.b.logString(), data.b.x+5, data.b.y - 5)
+      if (textLabels) context.fillText(`${i}: ${data.a.logString()}`, data.a.x+5, data.a.y - 5)
+      if (textLabels) context.fillText(data.b.logString(), data.b.x+5, data.b.y - 5)
+    } else
+    if (data instanceof Circle) {
+      context.beginPath();
+      context.globalAlpha = 0.4;
+      let holdStyle = context.fillStyle;
+      context.fillStyle = data.color;
+      context.arc(data.x, data.y, data.radius, 0, 2 * Math.PI, false);
+      context.fill();
+      context.fillStyle = holdStyle;
+      context.globalAlpha = 1;
+      // Stroke outline
+      // holdStyle = context.strokeStyle;
+      // context.strokeStyle = data.color;
+      // context.stroke();
+      // context.strokeStyle = holdStyle;
     } else
     if (Point.typeOf(data)) {
       context.beginPath();
       context.arc(data.x, data.y, 4, 0, 2 * Math.PI, false);
       context.fill();
-      context.fillText(`${i}: ${data.logString()}`, data.x + 5, data.y - 5);
+      if (textLabels) context.fillText(`${i}: ${data.logString()}`, data.x + 5, data.y - 5);
     } else
     if (data instanceof Polygon) {
       data.vertices.forEach((vertex, vIndex) => {

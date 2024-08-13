@@ -23,29 +23,40 @@
       <div id="dev-pane">
         <ul class="controls-settings" id="dev-pane-controls-settings">
           <li class="setting-item-button" id="setting-item-hide-control-window">Minimize Dev Pane</li>
-          <li class="control-setting-divider">ENGINE</li>
-          <li class="setting-item-toggle active" id="setting-item-updateToggle">Update Clock</li>
-          <li class="setting-item-toggle" id="setting-item-mouseLabelToggle"><b>M</b>ouse Label</li>
-          <li class="setting-item-toggle" id="setting-item-smearToggle"><b>S</b>mear</li>
+          <li class="control-setting-divider">RENDER</li>
+          <li class="setting-item-toggle active" id="setting-item-renderIndicator" title="Toggles display of the top-left spinning render indicator.">Render Indicator</li>
+          <li class="setting-item-toggle" id="setting-item-mouseLabelToggle" title="Toggles display of mouse coordinates on canvas.">Mouse Label</li>
+          <li class="setting-item-toggle" id="setting-item-smearToggle" title="Toggles inter-frame canvas clearing. Canvas pixel drawing will overlay.">Smear</li>
           <li class="control-setting-divider">MESH</li>
           <li class="settings-item-toolbox">
             <ul id="settings-item-toolbox-buttons">
-              <li id="settings-item-toolbox-pointer"></li>
-              <li id="settings-item-toolbox-constructor"></li>
-              <li id="settings-item-toolbox-eraser"></li>
-              <li id="settings-item-toolbox-pather"></li>
+              <li id="settings-item-toolbox-pointer" title="Canvas Pointer tool"></li>
+              <li id="settings-item-toolbox-constructor" title="Mesh Construction tool"></li>
+              <li id="settings-item-toolbox-eraser" title="Mesh Destruction tool"></li>
+              <li id="settings-item-toolbox-pather" title="Mesh Pathing tool"></li>
+              <li id="settings-item-toolbox-physcisDebugger" title="Physics tool"></li>
             </ul>
+            <p id="settings-item-toolbox-description"></p>
           </li>
-          <li class="setting-item-button" id="setting-item-mesh-reset">Reset</li>
-          <li class="setting-item-button" id="setting-item-mesh-load">Load</li>
-          <li class="setting-item-button" id="setting-item-mesh-print">Print</li>
+          <li class="setting-item-button" id="setting-item-mesh-reset" title="Reverts polygon layout to page default.">Reset</li>
+          <li class="setting-item-button" id="setting-item-mesh-load" title="Opens layout JSON loader dialog. Use Print button below to get serialized layout.">Load</li>
+          <li class="setting-item-button" id="setting-item-mesh-print" title="Outputs current layout as JSON to console panel below. Copy this into Load dialog to save layouts.">Print</li>
           <li class="control-setting-divider">TRIANGULATE</li>
-          <li class="setting-item-toggle" id="setting-item-triangulate-highlight-edges">Highlight Edges</li>
-          <li class="setting-item-toggle" id="setting-item-triangulate-optimize-pass">Optimization Pass</li>
+          <li class="setting-item-toggle" id="setting-item-triangulate-highlight-edges" title="Renders layout triangulation polygons.">Highlight Edges</li>
+          <!-- <li class="setting-item-toggle" id="setting-item-triangulate-optimize-pass">Optimization Pass</li> -->
           <li class="control-setting-divider">PATHING</li>
-          <li class="setting-item-button" id="setting-item-randomPath">Random Path</li>
+          <li class="setting-item-button" id="setting-item-randomPath" title="Sets a random start and finish destination for pathfinding.">Random Path</li>
+          <li class="control-setting-divider">PHYSICS</li>
+          <li class="setting-item-toggle active" id="setting-item-updateToggle" title="Toggles engine tick updates. Halts canvas rendering.">Engine Running</li>
+          <li class="setting-item-button" id="setting-item-stepTick" title="Moves clock by one tick. Pauses engine.">Step Tick</li>
+          <li class="setting-item-button" id="setting-item-clearBalls" title="Removes all current physics objects.">Clear Physics Objects</li>
+          <li class="setting-item-input" id="setting-item-input-damping">Damping</li>
+          <li class="setting-item-input" id="setting-item-input-elastic">Elastic</li>
+          <li class="setting-item-arrow" id="setting-item-arrow-gravity" title="Set direction of physics gravity.">Gravity</li>
           <li class="control-setting-divider">CONSOLE</li>
-          <li class="setting-item-button" id="setting-item-console-clear">Clear</li>
+          <li class="setting-item-toggle active" id="setting-item-console-toggle" title="Toggles visibility of console text.">Displayed</li>
+          <li class="setting-item-button" id="setting-item-console-clear" title="Clears current console text.">Clear</li>
+          <li class="setting-item-toggle" id="setting-item-console-text-render" title="Toggles geometry text labels when rendering log data.">Text Labels</li>
         </ul>
         <ul class="content-divider" id="dev-pane-content-divider">...</ul>
         <ul class="content-output" id="content-output">

@@ -5,7 +5,7 @@
   --control-setting-divider-height: 4px;
 }
 
-canvas {
+#bgCanvas {
   height: 100%;
   margin: 0;
   padding: 0;
@@ -47,6 +47,19 @@ canvas {
   width: 100%;
 }
 
+#dev-pane-controls-settings.hidden {
+  height: 38px;
+}
+#dev-pane-controls-settings.max-height {
+  height: 100%;
+}
+
+.controls-settings li {
+  color: var(--color-background);
+  font-size: 12px;
+  user-select: none;
+}
+
 .control-setting-divider {
   border-top: 1px solid gray;
   color: gray;
@@ -56,16 +69,6 @@ canvas {
   padding-bottom: 0;
 }
 
-#dev-pane-controls-settings.hidden {
-  height: 38px;
-}
-
-.controls-settings li {
-  color: var(--color-background);
-  cursor: pointer;
-  font-size: 12px;
-}
-
 .controls-settings::-webkit-scrollbar {
   height: 0;
   width: 0;
@@ -73,7 +76,9 @@ canvas {
 
 .controls-settings li.setting-item-toggle {
   background: url("../images/icon_settings@2x.png") no-repeat left center/16px;
+  background-color: lightgray;
   border-radius: 12px;
+  cursor: pointer;
   line-height: 26px;
   margin: 6px 6px 0 4px;
   padding: 0 0 0 20px;
@@ -104,6 +109,7 @@ canvas {
 .controls-settings li.setting-item-button {
   background-color: lightgray;
   border-radius: 12px;
+  cursor: pointer;
   line-height: 26px;
   margin: 6px 6px 0 4px;
   padding: 0 0 0 20px;
@@ -112,6 +118,43 @@ canvas {
   background-color: gray;
   color: white;
   text-decoration: underline;
+}
+
+.controls-settings li.setting-item-input {
+  align-items: center;
+  display: flex;
+  height: 20px;
+  margin: 6px 6px 0 10px;
+}
+
+.controls-settings li.setting-item-input input {
+  width: 50px;
+}
+
+.controls-settings li.setting-item-input p {
+  margin-left: 4px;
+}
+
+.controls-settings li.setting-item-arrow {
+  display: inline-block;
+  height: 60px;
+  margin: 10px;
+}
+
+.controls-settings li.setting-item-arrow canvas {
+  background-color: white;
+  border-radius: 50%;
+  border: 1px solid grey;
+  cursor: pointer;
+  display: inline-block;
+  height: 60px;
+  vertical-align: middle;
+  width: 60px;
+}
+
+.controls-settings li.setting-item-arrow p {
+  display: inline-block;
+  margin-left: 4px;
 }
 
 .controls-settings .settings-item-toolbox>ul {
@@ -132,10 +175,11 @@ canvas {
   border-width: 2px 2px 2px 0;
 }
 .controls-settings .settings-item-toolbox>ul>li {
-  background: url("../images/icon_settings@2x.png") no-repeat center/55%;
+  background: url("../images/icon_settings@2x.png") no-repeat center/contain;
   background-color: lightgray;
   border: 2px solid gray;
   display: inline-block;
+  cursor: pointer;
   height: 26px;
   margin: 0;
   padding: 0;
@@ -146,24 +190,45 @@ canvas {
   background-color: white;
 }
 #settings-item-toolbox-pointer {
-  background-image: url("../images/toolbox_icon_cursor.svg");
-}
-#settings-item-toolbox-pointer.active {
+  background-size: 55%;
   background-image: url("../images/toolbox_icon_cursor_alt.svg");
 }
+/* #settings-item-toolbox-pointer.active {
+  background-image: url("../images/toolbox_icon_cursor_alt.svg");
+} */
 #settings-item-toolbox-constructor {
-  background-image: url("../images/toolbox_icon_vertex_add.svg");
+  /* background-image: url("../images/toolbox_icon_vertex_add.svg"); */
+  background-image: url("../images/toolbox_icon_vertex_add.png");
 }
-#settings-item-toolbox-constructor.active {
+/* #settings-item-toolbox-constructor.active {
   background-image: url("../images/toolbox_icon_vertex_add_alt.svg");
-}
+} */
 #settings-item-toolbox-eraser {
-  background-image: url("../images/toolbox_icon_vertex_remove.svg");
+  background-image: url("../images/toolbox_icon_vertex_remove.png");
 }
-#settings-item-toolbox-eraser.active {
+/* #settings-item-toolbox-eraser.active {
   background-image: url("../images/toolbox_icon_vertex_remove_alt.svg");
+} */
+#settings-item-toolbox-pather {
+  /* background-image: url("../images/toolbox_icon_vertex_remove.svg"); */
+  background-image: url("../images/toolbox_icon_pathing.png");
 }
+/* #settings-item-toolbox-pather.active {
+  background-image: url("../images/toolbox_icon_vertex_remove.svg");
+} */
+#settings-item-toolbox-physcisDebugger {
+  /* background-image: url("../images/toolbox_icon_vertex_remove.svg"); */
+  background-image: url("../images/toolbox_icon_physics.png");
+}
+/* #settings-item-toolbox-physcisDebugger.active {
+  background-image: url("../images/toolbox_icon_vertex_remove_alt.svg");
+} */
 
+.controls-settings .settings-item-toolbox>p {
+  margin: 6px;
+  text-align: justify;
+  user-select: text;
+}
 /* - - - - - - - - DIVIDER - - - - - - - - */
 
 .content-divider {

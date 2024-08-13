@@ -1,102 +1,681 @@
-import { Point } from '@harxer/geometry'
+import { Point, Segment, Vector, equals } from '@harxer/geometry'
 import Layout from '@harxer/engine-2d/helpers/layout/Layout.js'
 import * as LayoutManager from '@harxer/engine-2d/helpers/layout/tools/LayoutManager.js'
-import { renderLogData, disableLogging, selectLogNext, selectLogPrev, attachLogOut } from './log.js'
-import log, { clear as clearConsole } from './log.js'
+import * as Collision from '@harxer/engine-2d/helpers/colliders/colliders.js'
+import { renderLogData, disableLogging, selectLogNext, selectLogPrev, attachLogOut, addLogSelectedNotifier } from './log.js'
+import log, { clear as clearConsole, toggleTextLabels } from './log.js'
 import * as TickClock from '@harxer/engine-2d/core/TickClock.js'
+import Mesh from '@harxer/engine-2d/helpers/layout/Mesh.js'
 
-// ==================================================================================================================== Variables =====
+// ============================================================================ Camera View Attributes =====
 const RENDER_SCALING = 2
 const RENDER_HERTZ = 30
+const SCALE_MIN = 1;
+const SCALE_MAX = 8;
+const SCALE_DELTA_MAX = 0.1;
+/** Camera attributes. */
 const view = {
   x: 0,
-  y: 0
+  y: 0,
+  scale: 1,
+  scaleAt: function(dScale, origin) {
+    dScale = 1 - Math.max(Math.min(dScale, SCALE_DELTA_MAX), SCALE_DELTA_MAX * -1);
+    let scale = Math.max(Math.min(this.scale * dScale, SCALE_MAX), SCALE_MIN);
+    if (this.scale === scale) return;
+    this.scale = scale;
+    // Zoom to mouse location
+    let x = RENDER_SCALING * origin.x;
+    let y = RENDER_SCALING * origin.y;
+    this.x = x - (x - this.x) * dScale;
+    this.y = y - (y - this.y) * dScale;
+  },
+  pan: function(dX, dY) {
+    this.x += dX;
+    this.y += dY;
+  },
+applyTransform: function() {
+    canvasMasterContext.setTransform(this.scale, 0, 0, this.scale, this.x, this.y);
+  }
 }
 
-let canvasFlush = true // if drawing frames are cleared or retained
-let canvas_bg = document.getElementById("bgCanvas")
-let canvasMasterContext = canvas_bg.getContext('2d') // The primary canvas particles are drawn on
-/** @type {Layout} */
+// ============================================================================ Mouse Attributes =====
+const MOUSE_TOOL = {
+  POINTER: {
+    id: 'settings-item-toolbox-pointer',
+    description: `
+      <b>Canvas Pointer tool</b><br>
+      Left-click updates mesh context selection - indicated by blue highlight in the canvas.
+      The current mesh context has various affects on other tools. Left-click over a hole polygon
+      to change context. Left-click outside current context to change to parent polygon.
+      Drag right-click to pan canvas.
+    `,
+    onDown: _ => {
+      if (mouse.down === MOUSE_LEFT) {
+        layout2D.contextSelection(mouse.contextLoc);
+        if (!TickClock.running()) render();
+      }
+    },
+    onMove: function() {
+      if (mouse.down === undefined) return;
+      //
+      view.pan(mouse.dLoc.x, mouse.dLoc.y);
+    }
+  },
+  MESH_CONSTRUCTOR: {
+    id: 'settings-item-toolbox-constructor',
+    description: `
+      <b>Mesh Construction tool</b><br>
+      Create new polygon by left-clicking to add vertices.
+      Close shape by overlaying first and last vertex. Undo vertices with right-click (no vertices is a pan).
+      Clockwise versus counter-clockwise affects generated mesh. Shape goes into current selected context.
+      If no polygons are present, the first polygon created has to be counter-clockwise.
+    `,
+    onDown: _ => {
+      if (mouse.down === MOUSE_LEFT ) {
+        LayoutManager.addConstructionPoint(layout2D, mouse.contextLoc);
+      } else if (mouse.down === MOUSE_RIGHT ) {
+        LayoutManager.undoConstructionPoint();
+      }
+      if (!TickClock.running()) render();
+    },
+    onMove: _ => {
+      LayoutManager.constructionMouseMoveHandler(mouse.contextLoc.x, mouse.contextLoc.y);
+
+      if (mouse.down === MOUSE_RIGHT) {
+        if (!LayoutManager.hasConstructorVertices()) {
+          view.pan(mouse.dLoc.x, mouse.dLoc.y);
+        }
+      }
+    }
+  },
+  MESH_ERASER: {
+    id: 'settings-item-toolbox-eraser',
+    description: `
+      <b>Mesh Destruction tool</b><br>
+      Right-click hole mesh to delete polygon and all its child polygons. Right-click outside
+      bounding polygon (highest level context) to delete bounding polygon.
+      Left-click performs context selection like the <i>Pointer tool</i>.
+    `,
+    onDown: _ => {
+      if (mouse.down === MOUSE_LEFT) {
+        layout2D.contextSelection(mouse.contextLoc);
+      } else if (mouse.down === MOUSE_RIGHT) {
+        if (layout2D.deleteMeshUnderPoint(mouse.contextLoc)) {
+          LayoutManager.writeLayout(layout2D);
+        }
+      }
+    }
+  },
+  PATHER: {
+    id: 'settings-item-toolbox-pather',
+    description: `
+      <b>Pathing tool</b><br>
+      Left-click, and/or drag, to set the starting point. Right-click, and/or drag, to set the
+      destination point. Path is routed through current mesh context.
+    `,
+    onSelection: function() {
+      this.onDown();
+    },
+    _lastLeftClick: undefined,
+    _lastRightClick: undefined,
+    onDown: function() {
+      // Get mouse location
+      let contextLeftMouse, contextRightMouse;
+      if (mouse.down === MOUSE_LEFT) {
+        this._lastLeftClick = mouse.loc.copy;
+      } else if (mouse.down === MOUSE_RIGHT) {
+        this._lastRightClick = mouse.loc.copy;
+      }
+      // Render circles at start/finish
+      flushTestShapes();
+      if (this._lastLeftClick) {
+        contextLeftMouse = new Point((this._lastLeftClick.x - view.x) / view.scale, (this._lastLeftClick.y - view.y) / view.scale)
+        testCircle(contextLeftMouse.x, contextLeftMouse.y, 6);
+      }
+      if (this._lastRightClick) {
+        contextRightMouse = new Point((this._lastRightClick.x - view.x) / view.scale, (this._lastRightClick.y - view.y) / view.scale)
+        testCircle(contextRightMouse.x, contextRightMouse.y, 6);
+      }
+      // Route path
+      if (contextLeftMouse && contextRightMouse) {
+        LayoutManager.setPathfindingRoute(layout2D.contextRoute(contextLeftMouse, contextRightMouse));
+      }
+    },
+    onMove: function() {
+      if (mouse.down === undefined) return;
+      // Dragging mouse is same as click
+      this.onDown();
+    }
+  },
+  PHYSICS_DEBUGGER: {
+    id: 'settings-item-toolbox-physcisDebugger',
+    description: `
+      <b>Physics tool</b><br>
+      Left-click, and/or drag, to spawn physics objects that will collide with the current mesh context.
+    `,
+    _heldPhysicsBall: undefined,
+    onDown: function() {
+      if (mouse.down === MOUSE_LEFT) { // Left click
+        let rSqrd = physicsDebug.endPointRadius * physicsDebug.endPointRadius;
+        if (Segment.distanceSqrd(mouse.contextLoc, physicsDebug.segment.a) < rSqrd) {
+          physicsDebug.holdingPoint = 1;
+        } else if (Segment.distanceSqrd(mouse.contextLoc, physicsDebug.segment.b) < rSqrd) {
+          physicsDebug.holdingPoint = 2;
+        } else {
+          let intersect = physicsBalls.find(ball => Vector.fromSegment(mouse.contextLoc, ball.position).magnitudeSqrd() <= (ball.radius * 2)**2);
+          if (intersect) {
+            this._heldPhysicsBall = intersect;
+          } else {
+            physicsBalls.push(new PhysicsBall(mouse.contextLoc.x, mouse.contextLoc.y, layout2D.meshContext))
+            physicsDebug.draggingAir = true;
+            TickClock.addInterval('spawn_bubbles', _ => {
+              physicsBalls.push(new PhysicsBall(mouse.contextLoc.x, mouse.contextLoc.y, layout2D.meshContext))
+            }, 15);
+          }
+        }
+      }
+    },
+    onMove: function() {
+      if (mouse.down === undefined) return;
+
+      if (this._heldPhysicsBall) {
+        // this._heldPhysicsBall.velocity = Vector.fromSegment(this._heldPhysicsBall.position, mouse.contextLoc).normalize().multiplyBy(0.06);
+
+        this._heldPhysicsBall.velocity = new Vector(0,0);
+        this._heldPhysicsBall.prevPosition = mouse.contextLoc;
+        this._heldPhysicsBall.position = mouse.contextLoc.minus(this._heldPhysicsBall.meshContext.bounds.edges[8].vector.perpendicular());
+      } else
+      if (physicsDebug.holdingPoint) {
+        if (physicsDebug.holdingPoint === 1) {
+          physicsDebug.segment = new Segment(mouse.contextLoc, physicsDebug.segment.vector)
+        } else
+        if (physicsDebug.holdingPoint === 2) {
+          physicsDebug.segment = new Segment(physicsDebug.segment.a, mouse.contextLoc)
+        }
+        physicsDebug.staticCollisionTest();
+      } else if (mouse.down === MOUSE_RIGHT) {
+        view.pan(mouse.dLoc.x, mouse.dLoc.y);
+      }
+    },
+    onUp: function() {
+      this._heldPhysicsBall = undefined;
+      physicsDebug.holdingPoint = 0;
+      if (physicsDebug.draggingAir) {
+        TickClock.removeInterval('spawn_bubbles');
+        physicsDebug.draggingAir = false;
+      }
+    }
+  },
+}
+const getMouseToolById = id => Object.values(MOUSE_TOOL).find(tool => tool.id === id);
+
+const MOUSE_LEFT = 0;
+const MOUSE_RIGHT = 1;
+export let mouse = {
+  /** Last mouse location. @type {Point} */
+  loc: new Point(0, 0),
+  /** Change in mouse location between mouse movements. @type {Vector} */
+  dLoc: new Vector(0, 0),
+  /** @type {MOUSE_TOOL} */
+  selectedTool: undefined,
+  /** @type {undefined | MOUSE_LEFT | MOUSE_RIGHT} */
+  down: undefined,
+  /** Get last mouse location relative to view. @type {Point} */
+  get contextLoc() {
+    return new Point((this.loc.x - view.x) / view.scale, (this.loc.y - view.y) / view.scale)
+  },
+  /** Flag for mouse label rendering. @type {boolean} */
+  labelVisible: false,
+}
+
+/** Only log if not running engine. */
+function debugLog() {
+  if (TickClock.running()) return;
+  log(...arguments);
+}
+
+// ===================================================================================== Physics =====
+
+/** @type {[PhysicsBall]} */
+let physicsBalls = [];
+let _physicsBallGarbage = false;
+// Number of collisions that can be compounded in a single tick
+const MAX_COLLISIONS = 10;
+const PHYSICS_BALL_RADIUS = 10;
+const PHYSICS_BALL_FRICTION_MAGNITUDE = 12; //
+const PHYSICS_BALL_GRAVITY_MAGNITUDE = 3000;
+const PHYSICS_BALL_GRAVITY = new Vector(0, -PHYSICS_BALL_GRAVITY_MAGNITUDE);
+const PHYSICS_BALL_REMOVE_DIST_SQRD = 4500*4500;
+let physicsBallDamping = 0.7; // %
+let physicsBallElastic = 1; // %
+
+export class Circle {
+  constructor(position, radius, color = 'green') {
+    this.x = position.x;
+    this.y = position.y;
+    this.radius = radius;
+    this.color = color;
+  }
+  get copy() {
+    return this;
+  }
+}
+
+const physicsDebug = {
+  endPointRadius: 10,
+  /** undefined - no hold, 1 - holding endpoint a, 2 - holding endpoint b */
+  holdingPoint: 0,
+  draggingAir: false,
+  segment: new Segment({x: 100, y: 100}, {x: 200, y: 200}),
+  isStaticIntersecting: false,
+  intersectionPoint: false,
+  reflectionPoint: false,
+  render: function(context) {
+    context.strokeStyle = this.isStaticIntersecting ? "green" : "red";
+    context.lineWidth = this.endPointRadius * 2;
+    context.beginPath();
+    context.moveTo(this.segment.a.x, this.segment.a.y);
+    context.lineTo(this.segment.b.x, this.segment.b.y);
+    context.stroke();
+    context.beginPath();
+    context.lineWidth = 1;
+
+    context.fillStyle = "white"
+    context.beginPath();
+    context.arc(this.segment.a.x, this.segment.a.y, this.endPointRadius, 0, 2 * Math.PI);
+    context.fill();
+    context.stroke();
+    context.beginPath();
+    context.arc(this.segment.b.x, this.segment.b.y, this.endPointRadius, 0, 2 * Math.PI);
+    context.fill();
+    context.stroke();
+
+    if (this.isStaticIntersecting) {
+      context.fillStyle = "blue"
+      context.beginPath();
+      context.arc(this.intersectionPoint.x, this.intersectionPoint.y, 4, 0, 2 * Math.PI);
+      context.fill();
+
+      context.beginPath();
+      context.moveTo(this.intersectionPoint.x, this.intersectionPoint.y);
+      context.lineTo(this.reflectionPoint.x, this.reflectionPoint.y);
+      context.stroke();
+      context.beginPath();
+    }
+  },
+  staticCollisionTest: function() {
+    let { intersectTime, collisionNormal, edge } = layout2D.meshContext.bounds.edges.reduce((smallest, edge, i) => {
+      let {intersectTime, collisionNormal} = Collision.capsuleInSegment(edge, this.endPointRadius, this.segment);
+      if (intersectTime === undefined || intersectTime > 1) return smallest;
+      return (intersectTime < smallest.intersectTime) ? {intersectTime, collisionNormal, edge} : smallest;
+    }, {intersectTime: Infinity});
+
+    if (!collisionNormal) {
+      this.isStaticIntersecting = false;
+      return;
+    };
+
+    this.isStaticIntersecting = true;
+    this.intersectionPoint = this.segment.a.copy.add(this.segment.vector.copy.multiplyBy(intersectTime));
+
+    let reflectionVector = this.segment.vector.reflect(collisionNormal).multiplyBy(1 - intersectTime);
+    this.reflectionPoint = this.intersectionPoint.copy.add(reflectionVector);
+
+    // debugLog(`Reflection point ${}`)
+  }
+}
+
+class PhysicsBall {
+  constructor(x, y, meshContext, initVelocity) {
+    this.position = new Point(x, y)
+    this.prevPosition = this.position.copy;
+    /** @type {Vector} */
+    this.velocity = initVelocity ? initVelocity : new Vector(0, 0);
+    /** @type {Mesh} */
+    this.meshContext = meshContext;
+    this.garbage = false;
+    this.color = `rgb(${Math.random()*255},${Math.random()*255},${Math.random()*255})`
+    this.radius = PHYSICS_BALL_RADIUS;
+  }
+  /** Apply tick to entity.
+   * Entity accumulates velocity as impulses (forces) are applied. That velocity value, as a descriptor of its movement over time,
+   * is applied to the position of the entity. This tick will be given the difference in time from the last tick executed.
+   *
+   * Forces are applied at a discrete point in time. The entity is immediately accelerated.
+   *
+   * We apply friction before velocity-on-position so that entities can be "stuck" to the ground until enough force
+   * is applied to move it.
+   * We apply gravity before velocity-on-position so that an object spawned in the air does not
+   * "float" for one frame before being accelerated.
+   */
+  update(dT) {
+    this.prevPosition = this.position.copy;
+    debugLog(`Tick. Start: ${this.prevPosition.logString()} dT:${dT}`, [new Circle(this.prevPosition, this.radius, this.color), this.prevPosition.copy]);
+
+    // Applying a constant downwards force simulates gravity. This creates the effect of an observer on the same plane as the world...
+    if (!equals(PHYSICS_BALL_GRAVITY.magnitudeSqrd(), 0)) {
+      this.velocity.minus(PHYSICS_BALL_GRAVITY.copy.multiplyBy(dT));
+    } else // ..or..
+    // Applying a constant reduction to velocity simulates friction. This creates the effect of looking down from above at the world.
+    if (!equals(this.velocity.magnitudeSqrd(), 0) && PHYSICS_BALL_FRICTION_MAGNITUDE !== 0) {
+      this.velocity.reduceBy(PHYSICS_BALL_FRICTION_MAGNITUDE * dT);
+    }
+
+    // Apply velocity to position based on how much time has passed since last tick (dT)
+    if (!equals(this.velocity.magnitudeSqrd(), 0)) {
+      debugLog(`--vInit: ${this.velocity.logString()}`, [new Circle(this.prevPosition, this.radius, this.color), new Segment(this.prevPosition.copy, this.velocity.copy.multiplyBy(dT))]);
+      this.position.add(this.velocity.copy.multiplyBy(dT));
+    }
+
+    // Check static collisions - TODO - broad scope pass
+    let intersections = 0;
+    while (intersections < MAX_COLLISIONS) {
+      let displaceA = new Segment(this.prevPosition, this.position);
+      let edgesToCheck = [...this.meshContext.holes.map(hole => hole.bounds.edges).flat(), ...this.meshContext.bounds.edges];
+      let { intersectTime, collisionNormal, edge } = edgesToCheck.reduce((smallest, edge, i) => {
+        let {intersectTime, collisionNormal} = Collision.capsuleInSegment(edge, this.radius, displaceA);
+        if (intersectTime === undefined || intersectTime > 1) return smallest;
+        return (intersectTime < smallest.intersectTime) ? {intersectTime, collisionNormal, edge} : smallest;
+      }, {intersectTime: Infinity});
+
+      if (!collisionNormal) break;
+
+      let aHitpoint = displaceA.a.copy.add(displaceA.vector.copy.multiplyBy(intersectTime));
+      debugLog(` - Intersect (${intersections}) t: ${intersectTime}`, [new Circle(aHitpoint.copy, this.radius, this.color), new Segment(aHitpoint.copy, new Vector({magnitude: this.velocity.copy.multiplyBy(dT).magnitude, angle: collisionNormal.angle})), edge, new Segment(this.prevPosition.copy, this.velocity.copy.multiplyBy(dT))]);
+      // let bHitpoint = edge.a.copy.add(edge.vector.copy.multiplyBy(intersectTime));
+
+      // let remainingVelMagnitude = this.velocity.copy.multiplyBy(1 - intersectTime).magnitude;
+
+      this.position = aHitpoint.copy; // TODO - no need to copy but easier debugLog
+
+      // TODO - escape vectors if start position is inside a collider
+      // Since we don't have good escape vector handling, we want to avoid entities being inside each other (start pos of capsule is colliding; intersectionTime == 0).
+      // If there are multiple intersections in a tick, its harder to tell how to escape the entity if we keep moving the prevPosition to the point of intersection.
+      // So we're not going to move the start position up to the collision point and re-evaluate from there even though this is more accurate to the path travelled.
+      // We'll keep start position where it is, and treat the final position after bounce reflection as the end point. We could also keep prevPosition and still
+      // re-evaluate the new capsule starting from the first intersection point but then how do we create an escape vector with the original position in mind...
+      // What can we even do with that original information? So we'll leave out prevPosition updating:
+      // this.prevPosition = this.position.copy;
+
+      if (!equals(this.velocity.magnitudeSqrd(), 0)) {
+        // TODO hitting an endcap, the normal for obj elastic should be a sphere on sphere escape vector (not wall segment)
+        this.velocity = this.velocity.reflect(collisionNormal, physicsBallElastic, physicsBallDamping);
+        this.position.add(this.velocity.copy.multiplyBy(dT).multiplyBy(1 - intersectTime));
+      } else {
+        // TODO - until capsule intersection returns an escape vector, if there's no velocity, it'll never leave penetrated peer
+        break;
+      }
+
+      // TODO - lets just resolve all intersections (for loop until no more collisions, keep advancing the object)
+      // Why: We won't be dealing with fast objects. its end-use will be slow moving pellets for wisp tank.
+      // Sequential solution but deep level of intersection resolution in a tick
+
+      // Move by remaining velocity in this tick
+
+
+      // // Add remaining velocity in this tick
+      // this.velocity.extendBy(remainingVelMagnitude);
+
+      // TODO add a check for intersectTime being zero - need to make sure we move obj out of capsule
+      // TODO can run entire intersection step over again for those that had intersections (on new prevPos/pos)
+      debugLog(` - Reflect. ${this.velocity.logString()}`, [new Circle(aHitpoint.copy, this.radius, this.color), new Segment(aHitpoint.copy, new Vector({magnitude: this.velocity.copy.multiplyBy(dT).magnitude, angle: collisionNormal.angle})), edge]);
+
+      intersections++;
+    }
+
+    // // Apply velocity - if no collision
+    // if (!equals(this.velocity.magnitudeSqrd(), 0)) {
+    //   this.position.add(this.velocity.copy.multiplyBy(dT))
+    // }
+
+    // Delete below dead zone
+
+    if (Segment.distanceSqrd({x: -view.x, y: -view.y}, this.position) > PHYSICS_BALL_REMOVE_DIST_SQRD) {
+      this.remove();
+    }
+  }
+
+  // Check peer collision should happen after physics applied to all bodies so
+  // collision interpolation can be performed.
+  // Assumes this and peer are circles. Does not check capsule collision - only line collision
+  handleCollisionTick(dT, peer) {
+    if (this === peer || peer.garbage) return;
+
+    let displaceA = new Segment(this.prevPosition, this.position);
+    let displaceB = new Segment(peer.prevPosition, peer.position);
+
+    let intersectTime = Collision.capsuleInCapsule(displaceA, this.radius, displaceB, peer.radius);
+    if (intersectTime === undefined || intersectTime > 1) return;
+
+    let aHitpoint = displaceA.a.copy.add(displaceA.vector.copy.multiplyBy(intersectTime));
+    let bHitpoint = displaceB.a.copy.add(displaceB.vector.copy.multiplyBy(intersectTime));
+
+    let vDisplace = Vector.fromSegment(aHitpoint, bHitpoint); // position b - a
+    let velResult = peer.velocity.copy.minus(this.velocity); // vel b - a
+
+    // Apply elastic collision
+    this.velocity.minus(
+      vDisplace.copy.flip().multiplyBy(velResult.copy.flip().dotProduct(vDisplace.copy.flip()) / Math.pow(vDisplace.magnitude, 2))
+    );
+    peer.velocity.minus(
+      vDisplace.copy.multiplyBy(velResult.dotProduct(vDisplace) / Math.pow(vDisplace.magnitude, 2))
+    );
+
+    // Move colliders out of each other
+    this.position = aHitpoint;
+    peer.position = bHitpoint;
+
+    this.position.add(this.velocity.copy.multiplyBy(dT).multiplyBy(1 - intersectTime))
+    peer.position.add(peer.velocity.copy.multiplyBy(dT).multiplyBy(1 - intersectTime))
+  }
+
+  render(context) {
+    context.strokeStyle = 'gray';
+    context.beginPath();
+    context.moveTo(this.prevPosition.x, this.prevPosition.y);
+    context.lineTo(this.position.x, this.position.y);
+    context.stroke();
+
+    context.fillStyle = this.color;
+    context.beginPath();
+    context.arc(this.position.x, this.position.y, this.radius, 0, 2 * Math.PI)
+    context.fill();
+  }
+
+  remove() {
+    this.garbage = true;
+    _physicsBallGarbage = true;
+  }
+}
+
+// ===================================================================================== UI Setup =====
+const canvasElem = document.getElementById("bgCanvas");
+const toolboxButtonsElem = document.getElementById('settings-item-toolbox-buttons');
+const toolboxDescriptionElem = document.getElementById('settings-item-toolbox-description');
+const devPaneElem = document.getElementById('dev-pane');
+const devPaneControlSettingsElem = document.getElementById('dev-pane-controls-settings');
+const settingItemClearBallsElem = document.getElementById('setting-item-clearBalls');
+const settingItemConsoleToggleElem = document.getElementById('setting-item-console-toggle');
+
+/** Primary canvas element 2D context @type {CanvasRenderingContext2D} */
+const canvasMasterContext = canvasElem.getContext('2d');
+
+/** Flag controlling canvas clearing. @type {boolean} */
+let canvasFlush = true;
+/** Primary layout obj. @type {Layout} */
 let layout2D = undefined;
 
-const MOUSE_TOOL = {
-  POINTER: 0,
-  MESH_CONSTRUCTOR: 1,
-  MESH_ERASER: 2,
-  PATHER: 3
-}
-
-export let mouse = {
-  loc: new Point(0, 0),
-  lastLeftClick: undefined,
-  lastRightClick: undefined,
-  tool: MOUSE_TOOL.POINTER,
-  get contextLoc() {
-    return new Point(this.loc.x - view.x, this.loc.y - view.y)
-  },
-  labelVisible: false
-}
-// Set default toolbox selection to pointer
-document.getElementById('settings-item-toolbox-pointer').className = 'active';
-/** 0 - no mouse drag, 1 - left mouse drag, 2 - right mouse drag */
-let canvasMouseDragging = 0;
-
-canvas_bg.width = RENDER_SCALING * canvas_bg.offsetWidth;
-canvas_bg.height = RENDER_SCALING * canvas_bg.offsetHeight;
-
-// ================================================================================================ Settings Initialization =====
-const SETTING_TOGGLE_ELEMENTS_MAP = {
+// Toggles
+Object.entries({
   'setting-item-updateToggle': toggleCanvasRunning,
   'setting-item-mouseLabelToggle': toggleMouseLabel,
+  'setting-item-renderIndicator': toggleRenderIndicator,
   'setting-item-smearToggle': toggleSmearRendering,
-  // Triangulate settings
   'setting-item-triangulate-highlight-edges': toggleTriangulateHighlightEdges,
-  'setting-item-triangulate-optimize-pass': _ => {}
-}
-Object.keys(SETTING_TOGGLE_ELEMENTS_MAP).forEach(
-  elemId => document.getElementById(elemId).addEventListener('click', e => {
+  // 'setting-item-triangulate-optimize-pass': _ => {},
+  'setting-item-console-text-render': toggleConsoleTextLabels,
+  'setting-item-console-toggle': toggleConsole
+}).forEach(([elemId, callback]) =>
+  document.getElementById(elemId).addEventListener('click', e => {
     e.target.classList.toggle("active");
-    SETTING_TOGGLE_ELEMENTS_MAP[elemId](e);
+    callback(e);
     e.preventDefault();
   })
-)
+);
 
-const SETTING_BUTTON_ELEMENTS_MAP = {
+// Buttons
+Object.entries({
   'setting-item-mesh-reset': resetLayout,
   'setting-item-mesh-load': loadLayout,
   'setting-item-mesh-print': printLayout,
   'setting-item-console-clear': clearConsole,
   'setting-item-randomPath': randomPath,
-  'setting-item-hide-control-window': hideControlWindow
-}
-Object.keys(SETTING_BUTTON_ELEMENTS_MAP).forEach(
-  elemId => document.getElementById(elemId).addEventListener('click', e => {
-    SETTING_BUTTON_ELEMENTS_MAP[elemId](e);
+  'setting-item-hide-control-window': hideControlWindow,
+  'setting-item-stepTick': TickClock.stepTick,
+  'setting-item-clearBalls': clearPhysicsBalls
+}).forEach(([elemId, callback]) =>
+  document.getElementById(elemId).addEventListener('click', e => {
+    callback(e);
     e.preventDefault();
   })
-)
+);
 
-// -------------- Dev pane resizing setup
-let devPaneContentResizing = false;
-document.getElementById('dev-pane-content-divider').onmousedown = e => {
-  devPaneContentResizing = true;
-}
-const ELEMENT_DEV_PANE = document.getElementById('dev-pane');
-const ELEMENT_DEV_PANE_CONTROL_SETTINGS = document.getElementById('dev-pane-controls-settings');
-ELEMENT_DEV_PANE.onmousemove = e => {
-  if (!devPaneContentResizing) return;
-  let scrollY = (e.target.getBoundingClientRect().top + e.offsetY) - ELEMENT_DEV_PANE.offsetTop - 10;
-  // ELEMENT_DEV_PANE_CONTROL_SETTINGS.style.height = `${scrollY / ELEMENT_DEV_PANE.offsetHeight * 100}%`
-  ELEMENT_DEV_PANE_CONTROL_SETTINGS.style.height = `${scrollY}px`
+// Inputs
+Object.entries({
+  'setting-item-input-damping': updateDamping,
+  'setting-item-input-elastic': updateElastic
+}).forEach(([elemId, callback]) => {
+  let elem = document.getElementById(elemId);
+  let text = elem.innerHTML;
+  elem.innerHTML = '';
+  let inputElem = document.createElement('input');
+  inputElem.setAttribute('title', text);
+  inputElem.setAttribute('id', `${elemId}-input`);
+  elem.append(inputElem);
+  let labelElem = document.createElement('p');
+  labelElem.innerHTML = text;
+  elem.append(labelElem);
+  inputElem.addEventListener('keydown', e => {
+    if (e.keyCode === KEY_CODE.ENTER) {
+      callback(inputElem);
+      e.preventDefault();
+    }
+  })
+})
+
+// Directional arrow setter
+Object.entries({
+  'setting-item-arrow-gravity': setupGravityControl
+}).forEach(([elemId, callback]) => {
+  let elem = document.getElementById(elemId);
+  let text = elem.innerHTML;
+  elem.innerHTML = '';
+  let canvasElem = document.createElement('canvas');
+  canvasElem.setAttribute('id', `canvas-${elemId}`);
+  canvasElem.width = 60;
+  canvasElem.height = 60;
+  elem.append(canvasElem);
+  let labelElem = document.createElement('p');
+  labelElem.innerHTML = text;
+  elem.append(labelElem);
+  callback(canvasElem);
+})
+
+// Mouse Toolbox
+Array.of(
+  'settings-item-toolbox-pointer',
+  'settings-item-toolbox-constructor',
+  'settings-item-toolbox-eraser',
+  'settings-item-toolbox-pather',
+  'settings-item-toolbox-physcisDebugger'
+).forEach(elemId => document.getElementById(elemId).addEventListener('click', handleToolboxClick));
+
+// Dev pane resizing
+const devPaneMouseMoveHandler = e => {
+  let scrollY = (e.target.getBoundingClientRect().top + e.offsetY) - devPaneElem.offsetTop - 10;
+  const MIN_SIZE = 30;
+  if (scrollY > devPaneElem.offsetHeight - MIN_SIZE) {
+    document.removeEventListener('mousemove', devPaneMouseMoveHandler);
+    settingItemConsoleToggleElem.click();
+  } else {
+    devPaneControlSettingsElem.style.height = `${scrollY}px`
+  }
   e.preventDefault();
 }
+document.getElementById('dev-pane-content-divider').addEventListener('mousedown', e => {
+  document.addEventListener('mousemove', devPaneMouseMoveHandler)
+  e.preventDefault();
+});
 document.addEventListener('mouseup', e => {
-  devPaneContentResizing = false;
+  document.removeEventListener('mousemove', devPaneMouseMoveHandler)
+  e.preventDefault();
+});
+document.addEventListener('mouseleave', e => {
+  document.removeEventListener('mousemove', devPaneMouseMoveHandler)
 })
-// --------------
 
+function updateDamping(inputElement) {
+  let parsed = parseInt(inputElement.value);
+  if (isNaN(parsed)) {
+    inputElement.value = `${physicsBallDamping}`
+  } else {
+    physicsBallDamping = inputElement.value
+  }
+}
+function updateElastic(inputElement) {
+  let parsed = parseInt(inputElement.value);
+  if (isNaN(parsed)) {
+    inputElement.value = `${physicsBallElastic}`
+  } else {
+    physicsBallElastic = inputElement.value
+  }
+}
+function setupGravityControl(canvasElem) {
+  let gravityControlContext = canvasElem.getContext('2d');
+  gravityControlContext.strokeStyle = 'black';
+  gravityControlContext.fillStyle = 'gray';
+  let width = 60;
+  let height = 60;
+  let pCenter = new Point(width / 2, height / 2);
+  const renderIndicator = vDirectionIndicator => {
+    let pDirectionIndicator = pCenter.copy.add(vDirectionIndicator);
+    gravityControlContext.clearRect(0, 0, width, height)
+    gravityControlContext.beginPath();
+    gravityControlContext.arc(pCenter.x, pCenter.y, 2, 0, 2 * Math.PI);
+    gravityControlContext.fill();
+    gravityControlContext.beginPath();
+    gravityControlContext.moveTo(pCenter.x, pCenter.y)
+    gravityControlContext.lineTo(pDirectionIndicator.x, pDirectionIndicator.y);
+    gravityControlContext.stroke();
+  }
+  const mouseMoveHandler = e => {
+    // Get mouse location
+    e.preventDefault();
+    let rect = canvasElem.getBoundingClientRect();
+    let loc = new Point(Math.floor(e.clientX - rect.left), (e.clientY - rect.top))
+
+    // Compute new gravity direction
+    let vDirectionIndicator = Vector.fromSegment(pCenter, loc);
+    PHYSICS_BALL_GRAVITY.angle = vDirectionIndicator.angle - Math.PI;
+
+    // Render indicator
+    vDirectionIndicator.magnitude = width;
+    renderIndicator(vDirectionIndicator);
+  }
+  canvasElem.addEventListener('mousedown', e => {
+    document.addEventListener('mousemove', mouseMoveHandler);
+    mouseMoveHandler(e);
+  });
+  document.addEventListener('mouseup', _ => document.removeEventListener('mousemove', mouseMoveHandler));
+  document.addEventListener('mouseleave', _ => document.removeEventListener('mousemove', mouseMoveHandler));
+
+  renderIndicator(PHYSICS_BALL_GRAVITY.copy.flip());
+}
 function toggleCanvasRunning() {
   TickClock.running() ? TickClock.stop() : TickClock.resume();
+}
+function toggleRenderIndicator() {
+  tickClockRunningIndicator = !tickClockRunningIndicator;
 }
 function toggleMouseLabel() {
   mouse.labelVisible = !mouse.labelVisible
@@ -112,10 +691,18 @@ function randomPath() {
   LayoutManager.setPathfindingRoute(
     layout2D.contextRoute(p1, p2)
   );
+  if (!TickClock.running()) render();
 }
-
-function toggleTriangulateHighlightEdges(e) {
+function toggleTriangulateHighlightEdges() {
   LayoutManager.triangulationVisible(!LayoutManager.visibleTriangulation)
+}
+function toggleConsole() {
+  devPaneControlSettingsElem.style.height = '';
+  devPaneControlSettingsElem.classList.toggle("max-height");
+}
+function toggleConsoleTextLabels() {
+  toggleTextLabels()
+  if (!TickClock.running()) render();
 }
 document.getElementById('modal-layout-load-close').addEventListener('click', _ => {
   document.getElementById('modal-layout-load').style.display = 'none';
@@ -127,13 +714,18 @@ document.getElementById('modal-layout-button-load').addEventListener('click', _ 
   document.getElementById('modal-layout-load').style.display = 'none';
 })
 function hideControlWindow(e) {
-  if (document.getElementById('dev-pane').classList.contains("hidden")) {
+  if (devPaneElem.classList.contains("hidden")) {
     e.target.innerHTML = "Minimize Dev Pane";
+    devPaneControlSettingsElem.style.overflowY = "";
   } else {
     e.target.innerHTML = "Maximize Dev Pane";
+    devPaneControlSettingsElem.style.overflowY = "hidden";
   }
-  document.getElementById('dev-pane').classList.toggle("hidden");
-  document.getElementById('dev-pane-controls-settings').classList.toggle("hidden");
+  devPaneElem.classList.toggle("hidden");
+  devPaneControlSettingsElem.classList.toggle("hidden");
+}
+function clearPhysicsBalls() {
+  physicsBalls.forEach(ball => ball.remove());
 }
 function loadLayout() {
   document.getElementById('modal-layout-load').style.display = 'block';
@@ -142,36 +734,27 @@ function resetLayout() {
   LayoutManager.reloadDefaultLayout().then(layout => layout2D = layout);
 }
 function printLayout() {
-  log(layout2D.serialized())
-  if (mouse.tool === MOUSE_TOOL.PATHER) {
-    log(`Left mouse: ${mouse.lastLeftClick?.logString()}. Right mouse: ${mouse.lastRightClick?.logString()}`)
-  }
+  log(layout2D.serialized());
 }
 
 function handleToolboxClick(e) {
-  for (const child of document.getElementById('settings-item-toolbox-buttons').children) {
+  for (const child of toolboxButtonsElem.children) {
     child.className = ""
   }
-  e.target.className = "active";
-  if (e.target.id === 'settings-item-toolbox-pointer') {
-    mouse.tool = MOUSE_TOOL.POINTER;
-  } else
-  if (e.target.id === 'settings-item-toolbox-constructor') {
-    mouse.tool = MOUSE_TOOL.MESH_CONSTRUCTOR;
-  } else
-  if (e.target.id === 'settings-item-toolbox-eraser') {
-    mouse.tool = MOUSE_TOOL.MESH_ERASER;
-  } else
-  if (e.target.id === 'settings-item-toolbox-pather') {
-    mouse.tool = MOUSE_TOOL.PATHER;
-  }
-}
-document.getElementById('settings-item-toolbox-pointer').addEventListener('click', handleToolboxClick)
-document.getElementById('settings-item-toolbox-constructor').addEventListener('click', handleToolboxClick)
-document.getElementById('settings-item-toolbox-eraser').addEventListener('click', handleToolboxClick)
-document.getElementById('settings-item-toolbox-pather').addEventListener('click', handleToolboxClick)
 
-// =================================================================================================================== Test rendering =====
+  let selectedTool = getMouseToolById(e.target.id);
+  if (!selectedTool) throw Error('Mouse tool target unknown.');
+
+  e.target.className = "active";
+  toolboxDescriptionElem.innerHTML = selectedTool.description || "";
+  LayoutManager.setPathfindingRoute([]);
+  flushTestShapes();
+
+  mouse.selectedTool = selectedTool;
+  mouse.selectedTool.onSelection?.bind(mouse.selectedTool)();
+}
+
+// ============================================================================== Test rendering =====
 let test_points = [];
 let test_lines = [];
 let test_circles = [];
@@ -181,6 +764,9 @@ let contentOutScrolling = false
 let contentOutTrackLastMouseMove = 0
 const CONTENT_OUT_SCROLL_SPEED = 1
 attachLogOut(contentOut)
+addLogSelectedNotifier(_ => {
+  if (!TickClock.running()) render();
+});
 contentOut.onmousemove = e => {
   let offsetY = contentOut.offsetTop
   contentOutTrackLastMouseMove = e.clientY - offsetY
@@ -238,7 +824,7 @@ function renderTestShapes() {
     canvasMasterContext.font = '20px sans-serif';
     canvasMasterContext.fillText(mouse.contextLoc.x+', '+mouse.contextLoc.y, mouse.contextLoc.x+5, mouse.contextLoc.y-5);
   }
-  if (mouse.tool === MOUSE_TOOL.MESH_CONSTRUCTOR) {
+  if (mouse.selectedTool === MOUSE_TOOL.MESH_CONSTRUCTOR) {
     canvasMasterContext.strokeStyle = "black"
     canvasMasterContext.lineWidth = 3;
     canvasMasterContext.beginPath();
@@ -255,19 +841,87 @@ function renderTestShapes() {
 
   renderLogData(canvasMasterContext)
 }
+function flushTestShapes() {
+  test_circles = [];
+}
 
-// ======================================================================================================================== Clock =====
+// =========================================================================================== Clock =====
+
+function update(dT) {
+  // Cleanup entities
+  if (_physicsBallGarbage) {
+    physicsBalls = physicsBalls.filter(ball => !ball.garbage);
+    _physicsBallGarbage = false;
+  }
+  settingItemClearBallsElem.innerHTML = `Clear Physics Balls (${physicsBalls.length})`;
+
+  physicsBalls.forEach(ball => ball.update(dT));
+
+  // Check collisions
+  for (let iA = 0; iA < physicsBalls.length; iA++) {
+    let peerA = physicsBalls[iA];
+    for (let iB = iA + 1; iB < physicsBalls.length; iB++) {
+      let peerB = physicsBalls[iB];
+      peerA.handleCollisionTick(dT, peerB);
+    }
+  }
+}
 
 function render() {
   if (canvasFlush) {
-    canvasMasterContext.clearRect(-view.x, -view.y, canvas_bg.width, canvas_bg.height)
+    // Reset to identity matrix for cleaning
+    canvasMasterContext.setTransform(1, 0, 0, 1, 0, 0);
+    canvasMasterContext.clearRect(0, 0, canvasElem.width, canvasElem.height)
+    view.applyTransform();
   }
 
-  LayoutManager.constructionRender(canvasMasterContext)
+  physicsBalls.forEach(ball => ball.render(canvasMasterContext));
+
+  let heldPhysicsBall = MOUSE_TOOL.PHYSICS_DEBUGGER._heldPhysicsBall;
+  if (heldPhysicsBall) {
+    canvasMasterContext.strokeStyle = 'red';
+    canvasMasterContext.beginPath();
+    canvasMasterContext.moveTo(heldPhysicsBall.position.x, heldPhysicsBall.position.y);
+    canvasMasterContext.lineTo(mouse.contextLoc.x, mouse.contextLoc.y);
+    canvasMasterContext.stroke();
+  }
+
+  TCRI_render(canvasMasterContext);
+
   LayoutManager.renderTriangulation(layout2D, canvasMasterContext)
+  LayoutManager.constructionRender(canvasMasterContext)
   if (contentOutScrolling) contentOut.scrollTop += CONTENT_OUT_SCROLL_SPEED
 
+  // Render physics debug line
+  if(mouse.selectedTool === MOUSE_TOOL.PHYSICS_DEBUGGER) {
+    physicsDebug.render(canvasMasterContext);
+  }
+
   renderTestShapes()
+}
+
+// Tick Clock Running Indicator
+let tickClockRunningIndicator = true;
+let TCRI_step = 0;
+let _TCRI_radius = 10;
+let _TCRI_subdiv_radius = 5;
+let _TCRI_subdiv = 60;
+let _TCRI_subdiv_angle = (2 * Math.PI) / _TCRI_subdiv;
+let _TCRI_center = new Point(20, 20);
+let _TCRI_pos_arr = Array(_TCRI_subdiv).fill().map((_, i) => _TCRI_center.copy.add(new Vector({magnitude: _TCRI_radius, angle: i * _TCRI_subdiv_angle})));
+function TCRI_render(context) {
+  if (!tickClockRunningIndicator) return;
+  TCRI_step = (TCRI_step + 1) % _TCRI_subdiv;
+
+  context.fillStyle = 'grey';
+  context.beginPath();
+  context.arc(_TCRI_center.x - view.x / view.scale, _TCRI_center.y - view.y / view.scale, _TCRI_radius + _TCRI_subdiv_radius, 0, 2 * Math.PI);
+  context.fill();
+  let tcri_pos = _TCRI_pos_arr[TCRI_step];
+  context.fillStyle = 'white';
+  context.beginPath();
+  context.arc(tcri_pos.x - view.x / view.scale, tcri_pos.y - view.y / view.scale, _TCRI_subdiv_radius, 0, 2 * Math.PI);
+  context.fill();
 }
 
 // ======================================================================================================================= Window Setup =====
@@ -277,6 +931,8 @@ const KEY_CODE = {
   ARROW_DOWN: 40,
   ARROW_LEFT: 37,
   SPACEBAR: 32,
+  ENTER: 13,
+  TAB: 9,
   G: 71,
   E: 69,
   M: 77,
@@ -297,11 +953,19 @@ const handleKeyDown = keyDownEvent => {
       selectLogNext();
       keyDownEvent.preventDefault()
       break;
+    case KEY_CODE.ARROW_RIGHT:
+      TickClock.stepTick();
+      keyDownEvent.preventDefault()
+      break;
+    case KEY_CODE.TAB:
+      document.getElementById('setting-item-hide-control-window').click();
+      keyDownEvent.preventDefault()
+      break;
     case KEY_CODE.SPACEBAR:
       document.getElementById('setting-item-updateToggle').click();
       break;
     case KEY_CODE.V:
-      let childElements = Array.from(document.getElementById('settings-item-toolbox-buttons').children);
+      let childElements = Array.from(toolboxButtonsElem.children);
       let iActive = childElements.findIndex(child => child.classList.contains('active'))
       iActive = (iActive + 1) % childElements.length;
       childElements[iActive].click();
@@ -310,106 +974,42 @@ const handleKeyDown = keyDownEvent => {
 }
 document.addEventListener('keydown', handleKeyDown)
 
-canvas_bg.onmousedown = e => {
-  if (e.button === 0) { // Left click
-    mouse.lastLeftClick = mouse.loc.copy;
-  } else { // Right click
-    mouse.lastRightClick = mouse.loc.copy;
-  }
+canvasElem.addEventListener('mousedown', e => {
+  let rect = canvasElem.getBoundingClientRect();
+  mouse.loc = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top))
+  mouse.down = (e.button === MOUSE_LEFT) ? MOUSE_LEFT : MOUSE_RIGHT;
 
-  if (mouse.tool === MOUSE_TOOL.MESH_CONSTRUCTOR) {
-
-    if (e.button === 0) {  // Left click add vertex or finish mesh if closed shape
-      LayoutManager.addConstructionPoint(layout2D, mouse.contextLoc);
-    } else { // Right click take back last constructor vertex
-      LayoutManager.undoConstructionPoint();
-    }
-
-  } else if (mouse.tool === MOUSE_TOOL.MESH_ERASER) {
-
-    if (layout2D.deleteMeshUnderPoint(mouse.contextLoc)) {
-      LayoutManager.writeLayout(layout2D);
-    }
-
-  } else if (mouse.tool === MOUSE_TOOL.POINTER) {
-
-    if (e.button === 0) { // Left click
-      console.log(`Loc:`, mouse.contextLoc)
-      layout2D.contextSelection(mouse.contextLoc);
-    } else { // Right click
-      canvasMouseDragging = 2;
-    }
-
-  } else if (mouse.tool === MOUSE_TOOL.PATHER) {
-
-    canvasMouseDragging = e.button === 0 ? 1 : 2;
-
-    let contextLeftMouse, contextRightMouse;
-
-    if (mouse.lastLeftClick) {
-      contextLeftMouse = mouse.lastLeftClick.copy.minus(view);
-      testCircle(contextLeftMouse.x, contextLeftMouse.y, 6, true)
-    }
-    if (mouse.lastRightClick) {
-      contextRightMouse = mouse.lastRightClick.copy.minus(view);
-      testCircle(contextRightMouse.x, contextRightMouse.y, 6)
-    }
-
-    if (mouse.lastLeftClick && mouse.lastRightClick) {
-      LayoutManager.setPathfindingRoute(
-        layout2D.contextRoute(contextLeftMouse, contextRightMouse)
-      );
-    }
-
-  }
+  mouse.selectedTool?.onDown?.bind(mouse.selectedTool)();
 
   e.preventDefault();
-}
+})
 
-canvas_bg.onmousemove = e => {
-  e.preventDefault()
-  let rect = canvas_bg.getBoundingClientRect();
-  mouse.loc = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top))
+canvasElem.addEventListener('mousemove', e => {
+  let rect = canvasElem.getBoundingClientRect();
+  let newLoc = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top));
+  mouse.dLoc = Vector.fromSegment(mouse.loc, newLoc);
+  mouse.loc = newLoc;
 
-  if (canvasMouseDragging > 0) {
-    if (mouse.tool === MOUSE_TOOL.POINTER) {
-      let x = mouse.loc.x - mouse.lastRightClick.x;
-      let y = mouse.loc.y - mouse.lastRightClick.y;
-      mouse.lastRightClick = new Point(mouse.loc.x, mouse.loc.y)
-      canvasMasterContext.translate(x, y)
-      view.x += x
-      view.y += y
-    } else if (mouse.tool === MOUSE_TOOL.PATHER) {
-      if (canvasMouseDragging === 1) { // Left click
-        mouse.lastLeftClick = mouse.loc.copy;
-      } else { // Right click
-        mouse.lastRightClick = mouse.loc.copy;
-      }
-
-      disableLogging(true);
-
-      let contextLeftMouse = mouse.lastLeftClick.copy.minus(view);
-      let contextRightMouse = mouse.lastRightClick.copy.minus(view);
-      testCircle(contextLeftMouse.x, contextLeftMouse.y, 6, true)
-      testCircle(contextRightMouse.x, contextRightMouse.y, 6)
-
-      LayoutManager.setPathfindingRoute(
-        layout2D.contextRoute(contextLeftMouse, contextRightMouse)
-      );
-    }
-  } else {
-    if (mouse.tool === MOUSE_TOOL.MESH_CONSTRUCTOR) {
-      LayoutManager.constructionMouseMoveHandler(mouse.contextLoc.x, mouse.contextLoc.y)
-    }
-  }
-}
-
-canvas_bg.onmouseup = e => {
-  canvasMouseDragging = false;
+  disableLogging(true); // Prevent log spam
+  mouse.selectedTool?.onMove?.bind(mouse.selectedTool)();
+  if (!TickClock.running()) render();
   disableLogging(false);
-}
 
-canvas_bg.oncontextmenu = e => e.preventDefault()
+  e.preventDefault()
+})
+
+canvasElem.addEventListener('mouseup', _ => {
+  mouse.down = undefined;
+
+  mouse.selectedTool?.onUp?.bind(mouse.selectedTool)();
+})
+
+canvasElem.addEventListener('wheel', e => {
+  view.scaleAt(e.deltaY / 1000 * 2, {x: e.offsetX, y: e.offsetY});
+  if (!TickClock.running()) render();
+})
+
+canvasElem.oncontextmenu = e => e.preventDefault()
 
 window.onresize = () => homeRefit()
 
@@ -419,8 +1019,8 @@ function homeRefit() {
   let transform = canvasMasterContext.getTransform()
 
   // Sync canvas size
-  canvas_bg.width = canvas_bg.offsetWidth * RENDER_SCALING;
-  canvas_bg.height = canvas_bg.offsetHeight * RENDER_SCALING;
+  canvasElem.width = canvasElem.offsetWidth * RENDER_SCALING;
+  canvasElem.height = canvasElem.offsetHeight * RENDER_SCALING;
 
   // Apply preserved context transformations
   canvasMasterContext.setTransform(transform)
@@ -435,10 +1035,18 @@ function homeRefit() {
   layout2D = new Layout();
   LayoutManager.initLayout().then(layout => {
     layout2D = layout;
+    // physicsBalls.push(new PhysicsBall(894, 614, layout2D.meshContext, new Vector(-0.5, 0)))
+    // physicsBalls.push(new PhysicsBall(844, 614, layout2D.meshContext))
+    // physicsBalls.push(new PhysicsBall(682, 374, layout2D.meshContext))
+    // physicsBalls.push(new PhysicsBall(860, 184, layout2D.meshContext))
   });
 
+  TickClock.addInterval('update', update)
   TickClock.addInterval('render', render, RENDER_HERTZ)
   TickClock.start()
+  handleToolboxClick({target: document.getElementById('settings-item-toolbox-pointer')});
+  document.getElementById('setting-item-input-damping-input').value = `${physicsBallDamping}`;
+  document.getElementById('setting-item-input-elastic-input').value = `${physicsBallElastic}`;
 
   document.getElementById('setting-item-hide-control-window').click();
 }
