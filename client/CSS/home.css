@@ -30,7 +30,9 @@
 
 #dev-pane.hidden {
   border-radius: 14px;
-  height: 38px;
+  /* height: 38px; */
+  width: 42px;
+  text-wrap: nowrap;
 }
 
 /* - - - - - - - - - CONTROLS - - - - - - - - - */
@@ -52,6 +54,9 @@
 }
 #dev-pane-controls-settings.max-height {
   height: 100%;
+}
+#dev-pane-controls-settings.disabled {
+  height: 100% !important;
 }
 
 .controls-settings li {
@@ -157,28 +162,33 @@
   margin-left: 4px;
 }
 
+.controls-settings .settings-item-toolbox {
+  display: flex;
+}
+
 .controls-settings .settings-item-toolbox>ul {
   /* background-color: lightgray; */
   /* border: 2px solid gray; */
   /* border-radius: 12px; */
   list-style: none;
-  margin: 6px 6px 0 4px;
+  margin: 4px 0 0 6px;
   padding: 0;
-  display: flex;
+  /* display: flex; */
 }
 .controls-settings .settings-item-toolbox>ul>li:first-child {
-  border-radius: 4px 0 0 4px;
-  border-width: 2px 0 2px 2px;
+  border-radius: 4px 4px 0 0;
+  /* border-width: 2px 2px 0 2px; */
 }
 .controls-settings .settings-item-toolbox>ul>li:last-child {
-  border-radius: 0 4px 4px 0;
-  border-width: 2px 2px 2px 0;
+  border-radius: 0 0 4px 4px;
+  border-width: 2px;
 }
 .controls-settings .settings-item-toolbox>ul>li {
   background: url("../images/icon_settings@2x.png") no-repeat center/contain;
   background-color: lightgray;
   border: 2px solid gray;
-  display: inline-block;
+  border-width: 2px 2px 0 2px;
+  /* display: inline-block; */
   cursor: pointer;
   height: 26px;
   margin: 0;
@@ -225,7 +235,7 @@
 } */
 
 .controls-settings .settings-item-toolbox>p {
-  margin: 6px;
+  margin: 4px 4px 0 4px;
   text-align: justify;
   user-select: text;
 }

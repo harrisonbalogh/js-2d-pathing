@@ -8,35 +8,69 @@ import * as TickClock from '@harxer/engine-2d/core/TickClock.js'
 import Mesh from '@harxer/engine-2d/helpers/layout/Mesh.js'
 
 // ============================================================================ Camera View Attributes =====
-const RENDER_SCALING = 2
+const RENDER_SCALING = 1
 const RENDER_HERTZ = 30
 const SCALE_MIN = 1;
 const SCALE_MAX = 8;
-const SCALE_DELTA_MAX = 0.1;
+const SCALE_DELTA_MAX = 1; // 0.1;
 /** Camera attributes. */
 const view = {
+  /** Camera X world center. */
   x: 0,
+  /** Camera Y world center. */
   y: 0,
   scale: 1,
-  scaleAt: function(dScale, origin) {
-    dScale = 1 - Math.max(Math.min(dScale, SCALE_DELTA_MAX), SCALE_DELTA_MAX * -1);
-    let scale = Math.max(Math.min(this.scale * dScale, SCALE_MAX), SCALE_MIN);
-    if (this.scale === scale) return;
-    this.scale = scale;
-    // Zoom to mouse location
-    let x = RENDER_SCALING * origin.x;
-    let y = RENDER_SCALING * origin.y;
-    this.x = x - (x - this.x) * dScale;
-    this.y = y - (y - this.y) * dScale;
+  scaleAt: function(dScale, origin = undefined) {
+    // Default to center if no origin specified
+    if (!origin) origin = {x: 0, y: 0}; // {x: 0.5, y: 0.5};
+    // Get actual scale change after imposed limits
+    let targetScale = Math.max(Math.min(this.scale - dScale, SCALE_MAX), SCALE_MIN);
+    dScale = targetScale - this.scale;
+    // Reset scale-velocity on hitting boundary
+    if (targetScale === this.scale) {
+      scaleVel = 0
+      return;
+    };
+
+    this.scale = targetScale;
+
+    // Anchor to origin
+    let xOffset = (origin.x - view.x) * dScale / this.scale;
+    let yOffset = (origin.y - view.y) * dScale / this.scale;
+
+    this.pan(xOffset, yOffset);
   },
+  /** Pan view by world coordinate deltas. */
   pan: function(dX, dY) {
     this.x += dX;
     this.y += dY;
+    this.applyTransform();
   },
-applyTransform: function() {
-    canvasMasterContext.setTransform(this.scale, 0, 0, this.scale, this.x, this.y);
+  applyTransform: function() {
+    canvasMasterContext.setTransform(
+      this.scale, 0,
+      0, this.scale,
+      (canvasElem.width / 2 - this.x * this.scale), (canvasElem.height / 2 - this.y * this.scale)
+    );
+  },
+  /** Convert screen corodinates to world coordinates. @param {Point} loc screen location. @returns {Point} */
+  screenToWorld: function(loc) {
+    // With origin centered:
+    return new Point((view.x + (loc.x - (canvasElem.width / 2))/ this.scale), (view.y + (loc.y - (canvasElem.height / 2))/ this.scale))
+    // With origin top-left:
+    // return new Point((this.loc.x - view.x) / view.scale, (this.loc.y - view.y) / view.scale)
+  },
+  /** Convert world corodinates to screen coordinates. @param {Point} loc world location. @returns {Point} */
+  worldToScreen: function(loc) {
+    return new Point(loc.x - view.x + (canvasElem.width / 2), loc.y - view.y + (canvasElem.height / 2))
   }
 }
+
+let scaleAccel = 0.05;
+let scaleAccelMax = 0.1
+let scaleDecelModifier = 0.1;
+let scaleDecel = scaleAccel * scaleDecelModifier;
+let scaleVel = 0;
 
 // ============================================================================ Mouse Attributes =====
 const MOUSE_TOOL = {
@@ -51,14 +85,16 @@ const MOUSE_TOOL = {
     `,
     onDown: _ => {
       if (mouse.down === MOUSE_LEFT) {
-        layout2D.contextSelection(mouse.contextLoc);
+        layout2D.contextSelection(mouse.worldLoc);
         if (!TickClock.running()) render();
       }
     },
     onMove: function() {
       if (mouse.down === undefined) return;
-      //
-      view.pan(mouse.dLoc.x, mouse.dLoc.y);
+
+      if (mouse.down === MOUSE_RIGHT) {
+        view.pan(-mouse.dLoc.x / view.scale, -mouse.dLoc.y / view.scale);
+      }
     }
   },
   MESH_CONSTRUCTOR: {
@@ -70,20 +106,22 @@ const MOUSE_TOOL = {
       Clockwise versus counter-clockwise affects generated mesh. Shape goes into current selected context.
       If no polygons are present, the first polygon created has to be counter-clockwise.
     `,
+    /** Distance to first construction point to trigger close polygon. @type {int} */
+    _snapDistance: 8,
     onDown: _ => {
       if (mouse.down === MOUSE_LEFT ) {
-        LayoutManager.addConstructionPoint(layout2D, mouse.contextLoc);
+        LayoutManager.addConstructionPoint(layout2D, mouse.worldLoc);
       } else if (mouse.down === MOUSE_RIGHT ) {
         LayoutManager.undoConstructionPoint();
       }
       if (!TickClock.running()) render();
     },
     onMove: _ => {
-      LayoutManager.constructionMouseMoveHandler(mouse.contextLoc.x, mouse.contextLoc.y);
+      LayoutManager.constructionMouseMoveHandler(mouse.worldLoc.x, mouse.worldLoc.y);
 
       if (mouse.down === MOUSE_RIGHT) {
         if (!LayoutManager.hasConstructorVertices()) {
-          view.pan(mouse.dLoc.x, mouse.dLoc.y);
+          view.pan(-mouse.dLoc.x / view.scale, -mouse.dLoc.y / view.scale);
         }
       }
     }
@@ -98,9 +136,9 @@ const MOUSE_TOOL = {
     `,
     onDown: _ => {
       if (mouse.down === MOUSE_LEFT) {
-        layout2D.contextSelection(mouse.contextLoc);
+        layout2D.contextSelection(mouse.worldLoc);
       } else if (mouse.down === MOUSE_RIGHT) {
-        if (layout2D.deleteMeshUnderPoint(mouse.contextLoc)) {
+        if (layout2D.deleteMeshUnderPoint(mouse.worldLoc)) {
           LayoutManager.writeLayout(layout2D);
         }
       }
@@ -122,18 +160,18 @@ const MOUSE_TOOL = {
       // Get mouse location
       let contextLeftMouse, contextRightMouse;
       if (mouse.down === MOUSE_LEFT) {
-        this._lastLeftClick = mouse.loc.copy;
+        this._lastLeftClick = mouse.screenLoc;
       } else if (mouse.down === MOUSE_RIGHT) {
-        this._lastRightClick = mouse.loc.copy;
+        this._lastRightClick = mouse.screenLoc;
       }
       // Render circles at start/finish
       flushTestShapes();
       if (this._lastLeftClick) {
-        contextLeftMouse = new Point((this._lastLeftClick.x - view.x) / view.scale, (this._lastLeftClick.y - view.y) / view.scale)
+        contextLeftMouse = view.screenToWorld(this._lastLeftClick);
         testCircle(contextLeftMouse.x, contextLeftMouse.y, 6);
       }
       if (this._lastRightClick) {
-        contextRightMouse = new Point((this._lastRightClick.x - view.x) / view.scale, (this._lastRightClick.y - view.y) / view.scale)
+        contextRightMouse = view.screenToWorld(this._lastRightClick);
         testCircle(contextRightMouse.x, contextRightMouse.y, 6);
       }
       // Route path
@@ -157,19 +195,19 @@ const MOUSE_TOOL = {
     onDown: function() {
       if (mouse.down === MOUSE_LEFT) { // Left click
         let rSqrd = physicsDebug.endPointRadius * physicsDebug.endPointRadius;
-        if (Segment.distanceSqrd(mouse.contextLoc, physicsDebug.segment.a) < rSqrd) {
+        if (Segment.distanceSqrd(mouse.worldLoc, physicsDebug.segment.a) < rSqrd) {
           physicsDebug.holdingPoint = 1;
-        } else if (Segment.distanceSqrd(mouse.contextLoc, physicsDebug.segment.b) < rSqrd) {
+        } else if (Segment.distanceSqrd(mouse.worldLoc, physicsDebug.segment.b) < rSqrd) {
           physicsDebug.holdingPoint = 2;
         } else {
-          let intersect = physicsBalls.find(ball => Vector.fromSegment(mouse.contextLoc, ball.position).magnitudeSqrd() <= (ball.radius * 2)**2);
+          let intersect = physicsBalls.find(ball => Vector.fromSegment(mouse.worldLoc, ball.position).magnitudeSqrd() <= (ball.radius * 2)**2);
           if (intersect) {
             this._heldPhysicsBall = intersect;
           } else {
-            physicsBalls.push(new PhysicsBall(mouse.contextLoc.x, mouse.contextLoc.y, layout2D.meshContext))
+            physicsBalls.push(new PhysicsBall(mouse.worldLoc.x, mouse.worldLoc.y, layout2D.meshContext))
             physicsDebug.draggingAir = true;
             TickClock.addInterval('spawn_bubbles', _ => {
-              physicsBalls.push(new PhysicsBall(mouse.contextLoc.x, mouse.contextLoc.y, layout2D.meshContext))
+              physicsBalls.push(new PhysicsBall(mouse.worldLoc.x, mouse.worldLoc.y, layout2D.meshContext))
             }, 15);
           }
         }
@@ -179,22 +217,22 @@ const MOUSE_TOOL = {
       if (mouse.down === undefined) return;
 
       if (this._heldPhysicsBall) {
-        // this._heldPhysicsBall.velocity = Vector.fromSegment(this._heldPhysicsBall.position, mouse.contextLoc).normalize().multiplyBy(0.06);
+        // this._heldPhysicsBall.velocity = Vector.fromSegment(this._heldPhysicsBall.position, mouse.worldLoc).normalize().multiplyBy(0.06);
 
         this._heldPhysicsBall.velocity = new Vector(0,0);
-        this._heldPhysicsBall.prevPosition = mouse.contextLoc;
-        this._heldPhysicsBall.position = mouse.contextLoc.minus(this._heldPhysicsBall.meshContext.bounds.edges[8].vector.perpendicular());
+        this._heldPhysicsBall.prevPosition = mouse.worldLoc;
+        this._heldPhysicsBall.position = mouse.worldLoc.minus(this._heldPhysicsBall.meshContext.bounds.edges[8].vector.perpendicular());
       } else
       if (physicsDebug.holdingPoint) {
         if (physicsDebug.holdingPoint === 1) {
-          physicsDebug.segment = new Segment(mouse.contextLoc, physicsDebug.segment.vector)
+          physicsDebug.segment = new Segment(mouse.worldLoc, physicsDebug.segment.vector)
         } else
         if (physicsDebug.holdingPoint === 2) {
-          physicsDebug.segment = new Segment(physicsDebug.segment.a, mouse.contextLoc)
+          physicsDebug.segment = new Segment(physicsDebug.segment.a, mouse.worldLoc)
         }
         physicsDebug.staticCollisionTest();
       } else if (mouse.down === MOUSE_RIGHT) {
-        view.pan(mouse.dLoc.x, mouse.dLoc.y);
+        view.pan(-mouse.dLoc.x / view.scale, -mouse.dLoc.y / view.scale);
       }
     },
     onUp: function() {
@@ -212,18 +250,29 @@ const getMouseToolById = id => Object.values(MOUSE_TOOL).find(tool => tool.id ==
 const MOUSE_LEFT = 0;
 const MOUSE_RIGHT = 1;
 export let mouse = {
-  /** Last mouse location. @type {Point} */
-  loc: new Point(0, 0),
+  /** Last mouse screen location. @type {Point} */
+  _screenLoc: new Point(0, 0),
+  /** Last mouse world location. @type {Point} */
+  _worldLoc: undefined,
+  set screenLoc(loc) {
+    this._screenLoc = loc;
+    this._worldLoc = undefined;
+  },
+  get screenLoc() {
+    return this._screenLoc.copy;
+  },
+  get worldLoc() {
+    if (this._worldLoc === undefined) {
+      this._worldLoc = view.screenToWorld(this.screenLoc);
+    }
+    return this._worldLoc.copy;
+  },
   /** Change in mouse location between mouse movements. @type {Vector} */
   dLoc: new Vector(0, 0),
   /** @type {MOUSE_TOOL} */
   selectedTool: undefined,
   /** @type {undefined | MOUSE_LEFT | MOUSE_RIGHT} */
   down: undefined,
-  /** Get last mouse location relative to view. @type {Point} */
-  get contextLoc() {
-    return new Point((this.loc.x - view.x) / view.scale, (this.loc.y - view.y) / view.scale)
-  },
   /** Flag for mouse label rendering. @type {boolean} */
   labelVisible: false,
 }
@@ -509,6 +558,7 @@ let layout2D = undefined;
 Object.entries({
   'setting-item-updateToggle': toggleCanvasRunning,
   'setting-item-mouseLabelToggle': toggleMouseLabel,
+  'setting-item-canvasOrigin': toggleCanvasOrigin,
   'setting-item-renderIndicator': toggleRenderIndicator,
   'setting-item-smearToggle': toggleSmearRendering,
   'setting-item-triangulate-highlight-edges': toggleTriangulateHighlightEdges,
@@ -526,11 +576,12 @@ Object.entries({
 // Buttons
 Object.entries({
   'setting-item-mesh-reset': resetLayout,
+  'setting-item-centerCamera': centerCamera,
   'setting-item-mesh-load': loadLayout,
   'setting-item-mesh-print': printLayout,
   'setting-item-console-clear': clearConsole,
   'setting-item-randomPath': randomPath,
-  'setting-item-hide-control-window': hideControlWindow,
+  'setting-item-toggle-control-window': toggleControlWindow,
   'setting-item-stepTick': TickClock.stepTick,
   'setting-item-clearBalls': clearPhysicsBalls
 }).forEach(([elemId, callback]) =>
@@ -677,6 +728,9 @@ function toggleCanvasRunning() {
 function toggleRenderIndicator() {
   tickClockRunningIndicator = !tickClockRunningIndicator;
 }
+function toggleCanvasOrigin() {
+  canvasOriginIndicator = !canvasOriginIndicator;
+}
 function toggleMouseLabel() {
   mouse.labelVisible = !mouse.labelVisible
 }
@@ -713,13 +767,15 @@ document.getElementById('modal-layout-button-load').addEventListener('click', _ 
   inputElement.value = '';
   document.getElementById('modal-layout-load').style.display = 'none';
 })
-function hideControlWindow(e) {
+function toggleControlWindow(e) {
   if (devPaneElem.classList.contains("hidden")) {
     e.target.innerHTML = "Minimize Dev Pane";
     devPaneControlSettingsElem.style.overflowY = "";
+    devPaneControlSettingsElem.classList.remove('disabled');
   } else {
     e.target.innerHTML = "Maximize Dev Pane";
     devPaneControlSettingsElem.style.overflowY = "hidden";
+    devPaneControlSettingsElem.classList.add('disabled');
   }
   devPaneElem.classList.toggle("hidden");
   devPaneControlSettingsElem.classList.toggle("hidden");
@@ -732,6 +788,11 @@ function loadLayout() {
 }
 function resetLayout() {
   LayoutManager.reloadDefaultLayout().then(layout => layout2D = layout);
+}
+function centerCamera() {
+  view.x = 0;
+  view.y = 0;
+  view.applyTransform();
 }
 function printLayout() {
   log(layout2D.serialized());
@@ -750,6 +811,9 @@ function handleToolboxClick(e) {
   LayoutManager.setPathfindingRoute([]);
   flushTestShapes();
 
+  if (mouse.down) {
+    mouse.selectedTool?.onUp?.bind(mouse.selectedTool)();
+  }
   mouse.selectedTool = selectedTool;
   mouse.selectedTool.onSelection?.bind(mouse.selectedTool)();
 }
@@ -821,17 +885,22 @@ function renderTestShapes() {
   })
   if (mouse.labelVisible) {
     canvasMasterContext.fillStyle = "black"
-    canvasMasterContext.font = '20px sans-serif';
-    canvasMasterContext.fillText(mouse.contextLoc.x+', '+mouse.contextLoc.y, mouse.contextLoc.x+5, mouse.contextLoc.y-5);
+    canvasMasterContext.font = `${20 / view.scale}px sans-serif`;
+    canvasMasterContext.fillText(Math.floor(mouse.worldLoc.x)+', '+Math.floor(mouse.worldLoc.y), mouse.worldLoc.x+5/view.scale, mouse.worldLoc.y-5/view.scale);
   }
   if (mouse.selectedTool === MOUSE_TOOL.MESH_CONSTRUCTOR) {
-    canvasMasterContext.strokeStyle = "black"
-    canvasMasterContext.lineWidth = 3;
+    canvasMasterContext.strokeStyle = "red"
+    canvasMasterContext.lineWidth = 1 / view.scale;
     canvasMasterContext.beginPath();
-    canvasMasterContext.moveTo(mouse.contextLoc.x - 20, mouse.contextLoc.y);
-    canvasMasterContext.lineTo(mouse.contextLoc.x + 20, mouse.contextLoc.y);
-    canvasMasterContext.moveTo(mouse.contextLoc.x, mouse.contextLoc.y - 20);
-    canvasMasterContext.lineTo(mouse.contextLoc.x, mouse.contextLoc.y + 20);
+    let length = MOUSE_TOOL.MESH_CONSTRUCTOR._snapDistance / view.scale;
+    let xCenter = mouse.worldLoc.x;
+    let yCenter = mouse.worldLoc.y;
+    canvasMasterContext.moveTo(xCenter - length, yCenter);
+    canvasMasterContext.lineTo(xCenter + length, yCenter);
+    canvasMasterContext.moveTo(xCenter, yCenter - length);
+    canvasMasterContext.lineTo(xCenter, yCenter + length);
+    canvasMasterContext.moveTo(xCenter + length, yCenter);
+    canvasMasterContext.arc(xCenter, yCenter, length, 0, 2 * Math.PI)
     canvasMasterContext.stroke();
     canvasMasterContext.lineWidth = 1;
   }
@@ -865,14 +934,27 @@ function update(dT) {
       peerA.handleCollisionTick(dT, peerB);
     }
   }
+
+  // Scale accel
+  if (Math.abs(scaleVel) <= scaleDecel) scaleVel = 0;
+  else {
+    view.scaleAt(scaleVel, mouse.worldLoc);
+    scaleVel -= Math.sign(scaleVel) * scaleDecel;
+  };
 }
 
 function render() {
   if (canvasFlush) {
     // Reset to identity matrix for cleaning
-    canvasMasterContext.setTransform(1, 0, 0, 1, 0, 0);
-    canvasMasterContext.clearRect(0, 0, canvasElem.width, canvasElem.height)
-    view.applyTransform();
+    // canvasMasterContext.setTransform(1, 0, 0, 1, 0, 0);
+    // canvasMasterContext.clearRect(0, 0, canvasElem.width, canvasElem.height)
+    // view.applyTransform();
+
+    let worldLocStart = view.screenToWorld({x: 0, y: 0});
+    let worldLocEnd = view.screenToWorld({x: canvasElem.width, y: canvasElem.height});
+    let w = worldLocEnd.x - worldLocStart.x;
+    let h = worldLocEnd.y - worldLocStart.y;
+    canvasMasterContext.clearRect(worldLocStart.x, worldLocStart.y, w, h);
   }
 
   physicsBalls.forEach(ball => ball.render(canvasMasterContext));
@@ -882,14 +964,19 @@ function render() {
     canvasMasterContext.strokeStyle = 'red';
     canvasMasterContext.beginPath();
     canvasMasterContext.moveTo(heldPhysicsBall.position.x, heldPhysicsBall.position.y);
-    canvasMasterContext.lineTo(mouse.contextLoc.x, mouse.contextLoc.y);
+    canvasMasterContext.lineTo(mouse.worldLoc.x, mouse.worldLoc.y);
     canvasMasterContext.stroke();
   }
 
   TCRI_render(canvasMasterContext);
+  canvasOrigin_render(canvasMasterContext);
 
-  LayoutManager.renderTriangulation(layout2D, canvasMasterContext)
-  LayoutManager.constructionRender(canvasMasterContext)
+  LayoutManager.renderPathfinding(canvasMasterContext);
+  if (canvasFlush) {
+    LayoutManager.renderTriangulation(layout2D, canvasMasterContext);
+    LayoutManager.constructionRender(canvasMasterContext);
+  }
+
   if (contentOutScrolling) contentOut.scrollTop += CONTENT_OUT_SCROLL_SPEED
 
   // Render physics debug line
@@ -901,7 +988,8 @@ function render() {
 }
 
 // Tick Clock Running Indicator
-let tickClockRunningIndicator = true;
+let tickClockRunningIndicator = false;
+let canvasOriginIndicator = false;
 let TCRI_step = 0;
 let _TCRI_radius = 10;
 let _TCRI_subdiv_radius = 5;
@@ -913,15 +1001,31 @@ function TCRI_render(context) {
   if (!tickClockRunningIndicator) return;
   TCRI_step = (TCRI_step + 1) % _TCRI_subdiv;
 
+  let worldLoc = view.screenToWorld(_TCRI_center);
   context.fillStyle = 'grey';
   context.beginPath();
-  context.arc(_TCRI_center.x - view.x / view.scale, _TCRI_center.y - view.y / view.scale, _TCRI_radius + _TCRI_subdiv_radius, 0, 2 * Math.PI);
+  context.arc(worldLoc.x, worldLoc.y, (_TCRI_radius + _TCRI_subdiv_radius) / view.scale, 0, 2 * Math.PI);
   context.fill();
-  let tcri_pos = _TCRI_pos_arr[TCRI_step];
+  let tcri_pos = view.screenToWorld(_TCRI_pos_arr[TCRI_step]);
   context.fillStyle = 'white';
   context.beginPath();
-  context.arc(tcri_pos.x - view.x / view.scale, tcri_pos.y - view.y / view.scale, _TCRI_subdiv_radius, 0, 2 * Math.PI);
+  context.arc(tcri_pos.x, tcri_pos.y, _TCRI_subdiv_radius / view.scale, 0, 2 * Math.PI);
   context.fill();
+}
+const _canvasOriginLength = 20;
+function canvasOrigin_render(context) {
+  if (!canvasOriginIndicator) return;
+
+  let length = _canvasOriginLength / view.scale;
+  context.lineWidth = 1 / view.scale;
+  context.strokeStyle = 'orange';
+  context.beginPath();
+  context.moveTo(-length, 0);
+  context.lineTo(length, 0);
+  context.moveTo(0, -length);
+  context.lineTo(0, length);
+  context.stroke();
+  context.lineWidth = 1;
 }
 
 // ======================================================================================================================= Window Setup =====
@@ -958,7 +1062,7 @@ const handleKeyDown = keyDownEvent => {
       keyDownEvent.preventDefault()
       break;
     case KEY_CODE.TAB:
-      document.getElementById('setting-item-hide-control-window').click();
+      document.getElementById('setting-item-toggle-control-window').click();
       keyDownEvent.preventDefault()
       break;
     case KEY_CODE.SPACEBAR:
@@ -975,8 +1079,7 @@ const handleKeyDown = keyDownEvent => {
 document.addEventListener('keydown', handleKeyDown)
 
 canvasElem.addEventListener('mousedown', e => {
-  let rect = canvasElem.getBoundingClientRect();
-  mouse.loc = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top))
+  mouse.screenLoc = new Point(e.offsetX, e.offsetY);
   mouse.down = (e.button === MOUSE_LEFT) ? MOUSE_LEFT : MOUSE_RIGHT;
 
   mouse.selectedTool?.onDown?.bind(mouse.selectedTool)();
@@ -985,10 +1088,9 @@ canvasElem.addEventListener('mousedown', e => {
 })
 
 canvasElem.addEventListener('mousemove', e => {
-  let rect = canvasElem.getBoundingClientRect();
-  let newLoc = new Point(RENDER_SCALING * Math.floor(e.clientX - rect.left), RENDER_SCALING * (e.clientY - rect.top));
-  mouse.dLoc = Vector.fromSegment(mouse.loc, newLoc);
-  mouse.loc = newLoc;
+  let newLoc = new Point(e.offsetX, e.offsetY);
+  mouse.dLoc = Vector.fromSegment(mouse.screenLoc, newLoc);
+  mouse.screenLoc = newLoc;
 
   disableLogging(true); // Prevent log spam
   mouse.selectedTool?.onMove?.bind(mouse.selectedTool)();
@@ -1005,7 +1107,7 @@ canvasElem.addEventListener('mouseup', _ => {
 })
 
 canvasElem.addEventListener('wheel', e => {
-  view.scaleAt(e.deltaY / 1000 * 2, {x: e.offsetX, y: e.offsetY});
+  scaleVel += Math.sign(e.deltaY) * scaleAccel;
   if (!TickClock.running()) render();
 })
 
@@ -1014,31 +1116,25 @@ canvasElem.oncontextmenu = e => e.preventDefault()
 window.onresize = () => homeRefit()
 
 function homeRefit() {
-  // Each time the height or width of a canvas is set,
-  // the canvas transforms will be cleared.
-  let transform = canvasMasterContext.getTransform()
-
   // Sync canvas size
-  canvasElem.width = canvasElem.offsetWidth * RENDER_SCALING;
-  canvasElem.height = canvasElem.offsetHeight * RENDER_SCALING;
+  canvasElem.width = canvasElem.offsetWidth;
+  canvasElem.height = canvasElem.offsetHeight;
 
-  // Apply preserved context transformations
-  canvasMasterContext.setTransform(transform)
+  // Each time the height or width of a canvas is set,
+  // the canvas transforms will be cleared. Reset transforms.
+  view.applyTransform();
 }
 
 // ======================================================================================================================= Launch =====
 
 {
-  homeRefit()
+  homeRefit();
+
   LayoutManager.setLayoutCookieKey('js-2d-pathing-layout')
   LayoutManager.setDefaultJsonLayoutUrl('layout_default.json')
   layout2D = new Layout();
   LayoutManager.initLayout().then(layout => {
     layout2D = layout;
-    // physicsBalls.push(new PhysicsBall(894, 614, layout2D.meshContext, new Vector(-0.5, 0)))
-    // physicsBalls.push(new PhysicsBall(844, 614, layout2D.meshContext))
-    // physicsBalls.push(new PhysicsBall(682, 374, layout2D.meshContext))
-    // physicsBalls.push(new PhysicsBall(860, 184, layout2D.meshContext))
   });
 
   TickClock.addInterval('update', update)
@@ -1048,5 +1144,7 @@ function homeRefit() {
   document.getElementById('setting-item-input-damping-input').value = `${physicsBallDamping}`;
   document.getElementById('setting-item-input-elastic-input').value = `${physicsBallElastic}`;
 
-  document.getElementById('setting-item-hide-control-window').click();
+  document.getElementById('setting-item-toggle-control-window').click();
+  document.getElementById('setting-item-canvasOrigin').click();
+  LayoutManager.setConstructionSnapDistance(MOUSE_TOOL.MESH_CONSTRUCTOR._snapDistance);
 }
