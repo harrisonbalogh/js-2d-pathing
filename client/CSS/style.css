@@ -19,12 +19,12 @@
   display: none !important;
 }
 .settings-dropdowns {
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   border: 1px solid transparent;
   border-width: 0 1px;
   display: flex;
-  height: 30px;
   justify-content: right;
-  left: 10px;
   list-style: none;
   margin: 0 10px 0 0;
   overflow-y: visible;
@@ -34,33 +34,51 @@
   top: 10px;
   user-select: none;
 }
+.settings-dropdowns.align-vertical {
+  bottom: 10px;
+  flex-direction: column;
+  overflow-y: auto;
+  width: 170px;
+}
+.settings-dropdowns.align-vertical > * {
+  flex-shrink: 0;
+}
+.settings-dropdowns:not(.align-vertical) {
+  height: 30px;
+  left: 10px;
+}
+.settings-dropdowns:not(.align-vertical) > * {
+  cursor: pointer;
+  flex-basis: 170px;
+  height: 30px;
+}
+.settings-dropdowns:not(.align-vertical) > *:hover,
+.settings-dropdowns:not(.align-vertical) > *.locked {
+  border: 1px solid grey;
+  height: fit-content;
+  overflow-y: visible;
+}
+.settings-dropdowns:not(.align-vertical) > *:hover > p,
+.settings-dropdowns:not(.align-vertical) > *.locked > p {
+  background-color: lightgrey;
+  background-image: url("../images/icon_unlock.png");
+}
+.settings-dropdowns:not(.align-vertical) > *.locked > p {
+  background-image: url("../images/icon_lock.png");
+}
 .settings-dropdowns > * {
   background-color: rgba(255, 255, 255, 0.65);
   border: 1px solid lightgray;
   color: grey;
-  cursor: pointer;
-  flex-basis: 170px;
   font-size: 12px;
-  height: 30px;
   margin: 0;
   padding: 0;
   overflow-y: hidden;
   overflow-x: hidden;
   text-align: left;
 }
-.settings-dropdowns > *:hover,
-.settings-dropdowns > *.locked {
-  border: 1px solid grey;
-  height: fit-content;
-  overflow-y: visible;
-}
-.settings-dropdowns > *:hover > p,
-.settings-dropdowns > *.locked > p {
-  background-color: lightgrey;
-  background-image: url("../images/icon_unlock.png");
-}
 .settings-dropdowns > * > *:first-child {
-  background: none no-repeat left center / 16px;
+  background: none no-repeat left 6px center / 16px;
   background-image: none;
   border-bottom: 1px solid lightgrey;
   color: black;
@@ -69,9 +87,6 @@
   margin: 0;
   padding: 0 10px;
   text-align: center;
-}
-.settings-dropdowns > * > *:first-child.locked {
-  background-image: url("../images/icon_lock.png");
 }
 .settings-dropdowns > * .setting-item-toggle {
   background: url("../images/icon_settings@2x.png") no-repeat left center / 16px;
@@ -133,6 +148,8 @@
   background: "" no-repeat center / contain;
   background-color: rgba(255, 255, 255, 0.65);
   background-image: url("../images/icon_x.png");
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   border: 1px solid lightgray;
   border-radius: 0 15px 0 0;
   cursor: pointer;
@@ -152,6 +169,8 @@
 }
 .settings-toolbox {
   background-color: rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   display: flex;
   flex-direction: column;
   list-style: none;
@@ -190,4 +209,57 @@
 }
 #settings-item-toolbox-physcisDebugger {
   background-image: url("../images/toolbox_icon_physics.png");
+}
+.modal {
+  background-color: rgba(0, 0, 0, 0.75);
+  inset: 0 0 0 0;
+  position: absolute;
+  text-align: center;
+}
+.modal > div {
+  box-shadow: 0 0 20px 0 black;
+  background-color: white;
+  border-radius: 14px;
+  left: 50%;
+  margin: 0;
+  max-width: 400px;
+  padding: 20px;
+  position: absolute;
+  text-align: left;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+}
+.modal > div > p {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+}
+.modal > div > .modal-close {
+  cursor: pointer;
+  border-radius: 4px 12px 4px 4px;
+  border: 1px solid gray;
+  background-color: transparent;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+.modal > div > .modal-close:hover {
+  background-color: lightgray;
+  border-color: transparent;
+  color: white;
+}
+.modal > div > textarea {
+  border: 1px solid black;
+  min-height: 200px;
+  width: 98%;
+}
+#modal-layout-button-load {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  float: right;
+  margin-top: 10px;
+}
+#modal-layout-load {
+  display: none;
 }

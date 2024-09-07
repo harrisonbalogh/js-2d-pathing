@@ -33,12 +33,12 @@
 // SETTINGS
 
 .settings-dropdowns {
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   border: 1px solid transparent;
   border-width: 0 1px;
   display: flex;
-  height: @settings-toggle-size;
   justify-content: right;
-  left: 10px;
   list-style: none;
   margin: 0 10px 0 0;
   overflow-y: visible;
@@ -48,35 +48,62 @@
   top: 10px;
   user-select: none;
 
-  // Selecting list items
+  // Vertically aligned dropdowns
+  &.align-vertical {
+    bottom: 10px;
+    flex-direction: column;
+    overflow-y: auto;
+    width: 170px;
+
+    // List items when parent is vertically aligned
+    > * {
+      flex-shrink: 0;
+    }
+  }
+
+  // Horizontally aligned dropdowns
+  &:not(.align-vertical) {
+    height: @settings-toggle-size;
+    left: 10px;
+
+    // List items when parent is horizontally aligned
+    > * {
+      cursor: pointer;
+      flex-basis: 170px;
+      height: @settings-toggle-size;
+
+      &:hover,  &.locked {
+        border: 1px solid grey;
+        height: fit-content;
+        overflow-y: visible;
+
+        > p {
+          background-color: lightgrey;
+          background-image: url("../images/icon_unlock.png");
+        }
+      }
+
+      &.locked > p {
+        background-image: url("../images/icon_lock.png");
+      }
+    }
+  }
+
+  // List items
   > * {
     background-color: rgba(255, 255, 255, 0.65);
     border: 1px solid lightgray;
     color: grey;
-    cursor: pointer;
-    flex-basis: 170px;
     font-size: 12px;
-    height: @settings-toggle-size;
     margin: 0;
     padding: 0;
     overflow-y: hidden;
     overflow-x: hidden;
     text-align: left;
 
-    &:hover,  &.locked {
-      border: 1px solid grey;
-      height: fit-content;
-      overflow-y: visible;
-
-      > p {
-        background-color: lightgrey;
-        background-image: url("../images/icon_unlock.png");
-      }
-    }
-
     // Dropdown item title 'p' element
     > *:first-child {
-      background: none no-repeat left center/16px;
+      background: none no-repeat left 6px center/16px;
       background-image: none;
       border-bottom: 1px solid lightgrey;
       color: black;
@@ -85,10 +112,6 @@
       margin: 0;
       padding: 0 10px;
       text-align: center;
-
-      &.locked {
-        background-image: url("../images/icon_lock.png");
-      }
     }
 
     .setting-item-toggle {
@@ -164,6 +187,8 @@
   background: "" no-repeat center/contain;
   background-color: rgba(255, 255, 255, 0.65);
   background-image: url("../images/icon_x.png");
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   border: 1px solid lightgray;
   border-radius: 0 15px 0 0;
   cursor: pointer;
@@ -186,6 +211,8 @@
 
 .settings-toolbox {
   background-color: rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   display: flex;
   flex-direction: column;
   list-style: none;
@@ -229,4 +256,68 @@
 }
 #settings-item-toolbox-physcisDebugger {
   background-image: url("../images/toolbox_icon_physics.png");
+}
+
+
+// MODAL
+
+.modal {
+  background-color: rgba(0, 0, 0, 0.75);
+  inset: 0 0 0 0;
+  position: absolute;
+  text-align: center;
+
+  > div {
+    box-shadow: 0 0 20px 0 black;
+    background-color: white;
+    border-radius: 14px;
+    left: 50%;
+    margin: 0;
+    max-width: 400px;
+    padding: 20px;
+    position: absolute;
+    text-align: left;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+
+    > p {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+    }
+
+    > .modal-close {
+      cursor: pointer;
+      border-radius: 4px 12px 4px 4px;
+      border: 1px solid gray;
+      background-color: transparent;
+      position: absolute;
+      top: 2px;
+      right: 2px;
+
+      &:hover {
+        background-color: lightgray;
+        border-color: transparent;
+        color: white;
+      }
+    }
+
+    > textarea {
+      border: 1px solid black;
+      min-height: 200px;
+      width: 98%;
+    }
+  }
+}
+
+#modal-layout-button-load {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  float: right;
+  margin-top: 10px;
+}
+
+#modal-layout-load {
+  display: none;
 }

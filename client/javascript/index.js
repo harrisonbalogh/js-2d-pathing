@@ -544,12 +544,9 @@ class PhysicsBall {
 // ===================================================================================== UI Setup =====
 const canvasElem = document.getElementById("main-canvas");
 const toolboxButtonsElem = document.getElementById('settings-toolbox');
-const devPaneElem = document.getElementById('dev-pane');
-// const devPaneControlSettingsElem = document.getElementById('dev-pane-controls-settings');
-const devPaneMinimizeButtonElem = document.getElementById('settings-minimize-button')
-const devPaneControlDropdownsElem = document.getElementById('settings-dropdowns');
+const settingsMinimizeButtonElem = document.getElementById('settings-minimize-button')
+const settingsDropdownsElem = document.getElementById('settings-dropdowns');
 const settingItemClearBallsElem = document.getElementById('setting-item-clearBalls');
-const settingItemConsoleToggleElem = document.getElementById('setting-item-console-toggle');
 
 /** Primary canvas element 2D context @type {CanvasRenderingContext2D} */
 const canvasMasterContext = canvasElem.getContext('2d');
@@ -565,11 +562,12 @@ Object.entries({
   'setting-item-collisionDebugger': toggleCollisionDebugger,
   'setting-item-mouseLabelToggle': toggleMouseLabel,
   'setting-item-canvasOrigin': toggleCanvasOrigin,
+  'setting-item-settingsAlignment': toggleVerticalSettings,
   'setting-item-renderIndicator': toggleRenderIndicator,
   'setting-item-smearToggle': toggleSmearRendering,
   'setting-item-triangulate-highlight-edges': toggleTriangulateHighlightEdges,
   // 'setting-item-triangulate-optimize-pass': _ => {},
-  'setting-item-console-text-render': toggleConsoleTextLabels,
+  // 'setting-item-console-text-render': toggleConsoleTextLabels,
   // 'setting-item-console-toggle': toggleConsole
 }).forEach(([elemId, callback]) =>
   document.getElementById(elemId).addEventListener('click', e => {
@@ -585,7 +583,7 @@ Object.entries({
   'setting-item-centerCamera': centerCamera,
   'setting-item-mesh-load': loadLayout,
   'setting-item-mesh-print': printLayout,
-  'setting-item-console-clear': clearConsole,
+  // 'setting-item-console-clear': clearConsole,
   'setting-item-randomPath': randomPath,
   'settings-minimize-button': toggleControlWindow,
   'setting-item-stepTick': toggleStepTick,
@@ -648,9 +646,8 @@ Array.of(
 ).forEach(elemId => document.getElementById(elemId).addEventListener('click', handleToolboxClick));
 
 // Dropdown headers lock on click
-for (const child of devPaneControlDropdownsElem.children) {
+for (const child of settingsDropdownsElem.children) {
   child.children[0].addEventListener('click', e => {
-    e.target.classList.toggle('locked');
     e.target.parentElement.classList.toggle('locked');
   });
 }
@@ -748,6 +745,9 @@ function toggleRenderIndicator() {
 function toggleCanvasOrigin() {
   canvasOriginIndicator = !canvasOriginIndicator;
 }
+function toggleVerticalSettings() {
+  settingsDropdownsElem.classList.toggle('align-vertical');
+}
 function toggleMouseLabel() {
   mouse.labelVisible = !mouse.labelVisible
 }
@@ -785,7 +785,7 @@ document.getElementById('modal-layout-button-load').addEventListener('click', _ 
   document.getElementById('modal-layout-load').style.display = 'none';
 })
 function toggleControlWindow(e) {
-  if (devPaneMinimizeButtonElem.classList.contains("minimized")) {
+  if (settingsMinimizeButtonElem.classList.contains("minimized")) {
     e.target.title = "Minimize Controls";
     // devPaneControlSettingsElem.style.overflowY = "";
     // devPaneControlSettingsElem.classList.remove('disabled');
@@ -795,9 +795,9 @@ function toggleControlWindow(e) {
     // devPaneControlSettingsElem.classList.add('disabled');
   }
   // devPaneElem.classList.toggle("minimized");
-  devPaneMinimizeButtonElem.classList.toggle('minimized');
+  settingsMinimizeButtonElem.classList.toggle('minimized');
   // devPaneControlSettingsElem.classList.toggle("minimized");
-  devPaneControlDropdownsElem.classList.toggle("hidden");
+  settingsDropdownsElem.classList.toggle("hidden");
   toolboxButtonsElem.classList.toggle('hidden');
 }
 function toggleStepTick() {
