@@ -1,0 +1,232 @@
+
+// VARIABLES
+
+@settings-toggle-size: 30px;
+
+// CONTENT
+
+.content {
+  background-color: var(--color-foreground);
+  bottom: 0;
+  left: 0;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+
+  canvas {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+  }
+}
+
+// SHARED
+
+.hidden {
+  display: none !important;
+}
+
+// SETTINGS
+
+.settings-dropdowns {
+  border: 1px solid transparent;
+  border-width: 0 1px;
+  display: flex;
+  height: @settings-toggle-size;
+  justify-content: right;
+  left: 10px;
+  list-style: none;
+  margin: 0 10px 0 0;
+  overflow-y: visible;
+  padding: 0;
+  position: absolute;
+  right: @settings-toggle-size;
+  top: 10px;
+  user-select: none;
+
+  // Selecting list items
+  > * {
+    background-color: rgba(255, 255, 255, 0.65);
+    border: 1px solid lightgray;
+    color: grey;
+    cursor: pointer;
+    flex-basis: 170px;
+    font-size: 12px;
+    height: @settings-toggle-size;
+    margin: 0;
+    padding: 0;
+    overflow-y: hidden;
+    overflow-x: hidden;
+    text-align: left;
+
+    &:hover,  &.locked {
+      border: 1px solid grey;
+      height: fit-content;
+      overflow-y: visible;
+
+      > p {
+        background-color: lightgrey;
+        background-image: url("../images/icon_unlock.png");
+      }
+    }
+
+    // Dropdown item title 'p' element
+    > *:first-child {
+      background: none no-repeat left center/16px;
+      background-image: none;
+      border-bottom: 1px solid lightgrey;
+      color: black;
+      height: @settings-toggle-size;
+      line-height: 30px;
+      margin: 0;
+      padding: 0 10px;
+      text-align: center;
+
+      &.locked {
+        background-image: url("../images/icon_lock.png");
+      }
+    }
+
+    .setting-item-toggle {
+      background: url("../images/icon_settings@2x.png") no-repeat left center/16px;
+      border-radius: 12px;
+      cursor: pointer;
+      line-height: 26px;
+      margin: 6px 10px 6px 6px;
+      padding: 0 0 0 20px;
+
+      &:hover {
+        text-decoration: underline;
+      }
+
+      &.active {
+        background-image: url("../images/icon_settings_x@2x.png");
+      }
+    }
+
+    .setting-item-button {
+      border-radius: 12px;
+      cursor: pointer;
+      line-height: 26px;
+      margin: 6px 10px 6px 6px;
+      padding: 0 0 0 20px;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    .setting-item-input {
+      align-items: center;
+      display: flex;
+      height: 20px;
+      margin: 6px 6px 0 10px;
+
+      input {
+        width: 50px;
+      }
+
+      p {
+        margin-left: 4px;
+      }
+    }
+
+    .setting-item-arrow {
+      display: inline-block;
+      height: 60px;
+      margin: 10px;
+
+      canvas {
+        background-color: white;
+        border-radius: 50%;
+        border: 1px solid grey;
+        cursor: pointer;
+        display: inline-block;
+        height: 60px;
+        padding: 0;
+        vertical-align: middle;
+        width: 60px;
+      }
+
+      p {
+        display: inline-block;
+        margin-left: 4px;
+      }
+    }
+  }
+}
+
+.settings-minimize-button {
+  background: "" no-repeat center/contain;
+  background-color: rgba(255, 255, 255, 0.65);
+  background-image: url("../images/icon_x.png");
+  border: 1px solid lightgray;
+  border-radius: 0 15px 0 0;
+  cursor: pointer;
+  height: @settings-toggle-size;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: @settings-toggle-size;
+
+  &:hover {
+    background-color: lightgrey;
+  }
+
+  &.minimized {
+    background-image: url("../images/icon_plus.png");
+    border-radius: 15px 15px 15px 0;
+    border-width: 1px;
+  }
+}
+
+.settings-toolbox {
+  background-color: rgba(255, 255, 255, 0.65);
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 11px 0 0 0;
+  padding: 0;
+  position: absolute;
+  right: 10px;
+  top: @settings-toggle-size;
+
+  // Select toolbox items
+  > * {
+    background: url("../images/icon_settings@2x.png") no-repeat center/26px;
+    border: 1px solid lightgray;
+    cursor: pointer;
+    height: @settings-toggle-size;
+    width: @settings-toggle-size;
+
+    &:last-child {
+      border-width: 1px;
+    }
+
+    &.active {
+      border-color: black;
+      background-color: lightgray;
+    }
+  }
+}
+
+#settings-item-toolbox-pointer {
+  background-size: 55%;
+  background-image: url("../images/toolbox_icon_cursor_alt.svg");
+}
+#settings-item-toolbox-constructor {
+  background-image: url("../images/toolbox_icon_vertex_add.png");
+}
+#settings-item-toolbox-eraser {
+  background-image: url("../images/toolbox_icon_vertex_remove.png");
+}
+#settings-item-toolbox-pather {
+  background-image: url("../images/toolbox_icon_pathing.png");
+}
+#settings-item-toolbox-physcisDebugger {
+  background-image: url("../images/toolbox_icon_physics.png");
+}

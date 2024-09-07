@@ -160,18 +160,18 @@ const MOUSE_TOOL = {
       // Get mouse location
       let contextLeftMouse, contextRightMouse;
       if (mouse.down === MOUSE_LEFT) {
-        this._lastLeftClick = mouse.screenLoc;
+        this._lastLeftClick = mouse.worldLoc;
       } else if (mouse.down === MOUSE_RIGHT) {
-        this._lastRightClick = mouse.screenLoc;
+        this._lastRightClick = mouse.worldLoc;
       }
       // Render circles at start/finish
       flushTestShapes();
       if (this._lastLeftClick) {
-        contextLeftMouse = view.screenToWorld(this._lastLeftClick);
+        contextLeftMouse = this._lastLeftClick;
         testCircle(contextLeftMouse.x, contextLeftMouse.y, 6);
       }
       if (this._lastRightClick) {
-        contextRightMouse = view.screenToWorld(this._lastRightClick);
+        contextRightMouse = this._lastRightClick;
         testCircle(contextRightMouse.x, contextRightMouse.y, 6);
       }
       // Route path
@@ -319,7 +319,11 @@ const physicsDebug = {
   isStaticIntersecting: false,
   intersectionPoint: false,
   reflectionPoint: false,
+  enabled: false,
   render: function(context) {
+    if(!this.enabled) return;
+    if(mouse.selectedTool !== MOUSE_TOOL.PHYSICS_DEBUGGER) return;
+
     context.strokeStyle = this.isStaticIntersecting ? "green" : "red";
     context.lineWidth = this.endPointRadius * 2;
     context.beginPath();
@@ -538,11 +542,12 @@ class PhysicsBall {
 }
 
 // ===================================================================================== UI Setup =====
-const canvasElem = document.getElementById("bgCanvas");
-const toolboxButtonsElem = document.getElementById('settings-item-toolbox-buttons');
-const toolboxDescriptionElem = document.getElementById('settings-item-toolbox-description');
+const canvasElem = document.getElementById("main-canvas");
+const toolboxButtonsElem = document.getElementById('settings-toolbox');
 const devPaneElem = document.getElementById('dev-pane');
-const devPaneControlSettingsElem = document.getElementById('dev-pane-controls-settings');
+// const devPaneControlSettingsElem = document.getElementById('dev-pane-controls-settings');
+const devPaneMinimizeButtonElem = document.getElementById('settings-minimize-button')
+const devPaneControlDropdownsElem = document.getElementById('settings-dropdowns');
 const settingItemClearBallsElem = document.getElementById('setting-item-clearBalls');
 const settingItemConsoleToggleElem = document.getElementById('setting-item-console-toggle');
 
@@ -557,6 +562,7 @@ let layout2D = undefined;
 // Toggles
 Object.entries({
   'setting-item-updateToggle': toggleCanvasRunning,
+  'setting-item-collisionDebugger': toggleCollisionDebugger,
   'setting-item-mouseLabelToggle': toggleMouseLabel,
   'setting-item-canvasOrigin': toggleCanvasOrigin,
   'setting-item-renderIndicator': toggleRenderIndicator,
@@ -564,7 +570,7 @@ Object.entries({
   'setting-item-triangulate-highlight-edges': toggleTriangulateHighlightEdges,
   // 'setting-item-triangulate-optimize-pass': _ => {},
   'setting-item-console-text-render': toggleConsoleTextLabels,
-  'setting-item-console-toggle': toggleConsole
+  // 'setting-item-console-toggle': toggleConsole
 }).forEach(([elemId, callback]) =>
   document.getElementById(elemId).addEventListener('click', e => {
     e.target.classList.toggle("active");
@@ -581,8 +587,8 @@ Object.entries({
   'setting-item-mesh-print': printLayout,
   'setting-item-console-clear': clearConsole,
   'setting-item-randomPath': randomPath,
-  'setting-item-toggle-control-window': toggleControlWindow,
-  'setting-item-stepTick': TickClock.stepTick,
+  'settings-minimize-button': toggleControlWindow,
+  'setting-item-stepTick': toggleStepTick,
   'setting-item-clearBalls': clearPhysicsBalls
 }).forEach(([elemId, callback]) =>
   document.getElementById(elemId).addEventListener('click', e => {
@@ -641,29 +647,37 @@ Array.of(
   'settings-item-toolbox-physcisDebugger'
 ).forEach(elemId => document.getElementById(elemId).addEventListener('click', handleToolboxClick));
 
-// Dev pane resizing
-const devPaneMouseMoveHandler = e => {
-  let scrollY = (e.target.getBoundingClientRect().top + e.offsetY) - devPaneElem.offsetTop - 10;
-  const MIN_SIZE = 30;
-  if (scrollY > devPaneElem.offsetHeight - MIN_SIZE) {
-    document.removeEventListener('mousemove', devPaneMouseMoveHandler);
-    settingItemConsoleToggleElem.click();
-  } else {
-    devPaneControlSettingsElem.style.height = `${scrollY}px`
-  }
-  e.preventDefault();
+// Dropdown headers lock on click
+for (const child of devPaneControlDropdownsElem.children) {
+  child.children[0].addEventListener('click', e => {
+    e.target.classList.toggle('locked');
+    e.target.parentElement.classList.toggle('locked');
+  });
 }
-document.getElementById('dev-pane-content-divider').addEventListener('mousedown', e => {
-  document.addEventListener('mousemove', devPaneMouseMoveHandler)
-  e.preventDefault();
-});
-document.addEventListener('mouseup', e => {
-  document.removeEventListener('mousemove', devPaneMouseMoveHandler)
-  e.preventDefault();
-});
-document.addEventListener('mouseleave', e => {
-  document.removeEventListener('mousemove', devPaneMouseMoveHandler)
-})
+
+// Settings resizing
+// const devPaneMouseMoveHandler = e => {
+//   let scrollY = (e.target.getBoundingClientRect().top + e.offsetY) - devPaneElem.offsetTop - 10;
+//   const MIN_SIZE = 30;
+//   if (scrollY > devPaneElem.offsetHeight - MIN_SIZE) {
+//     document.removeEventListener('mousemove', devPaneMouseMoveHandler);
+//     settingItemConsoleToggleElem.click();
+//   } else {
+//     devPaneControlSettingsElem.style.height = `${scrollY}px`
+//   }
+//   e.preventDefault();
+// }
+// document.getElementById('dev-pane-content-divider').addEventListener('mousedown', e => {
+//   document.addEventListener('mousemove', devPaneMouseMoveHandler)
+//   e.preventDefault();
+// });
+// document.addEventListener('mouseup', e => {
+//   document.removeEventListener('mousemove', devPaneMouseMoveHandler)
+//   e.preventDefault();
+// });
+// document.addEventListener('mouseleave', e => {
+//   document.removeEventListener('mousemove', devPaneMouseMoveHandler)
+// })
 
 function updateDamping(inputElement) {
   let parsed = parseInt(inputElement.value);
@@ -725,6 +739,9 @@ function setupGravityControl(canvasElem) {
 function toggleCanvasRunning() {
   TickClock.running() ? TickClock.stop() : TickClock.resume();
 }
+function toggleCollisionDebugger() {
+  physicsDebug.enabled = !physicsDebug.enabled;
+}
 function toggleRenderIndicator() {
   tickClockRunningIndicator = !tickClockRunningIndicator;
 }
@@ -750,10 +767,10 @@ function randomPath() {
 function toggleTriangulateHighlightEdges() {
   LayoutManager.triangulationVisible(!LayoutManager.visibleTriangulation)
 }
-function toggleConsole() {
-  devPaneControlSettingsElem.style.height = '';
-  devPaneControlSettingsElem.classList.toggle("max-height");
-}
+// function toggleConsole() {
+//   devPaneControlSettingsElem.style.height = '';
+//   devPaneControlSettingsElem.classList.toggle("max-height");
+// }
 function toggleConsoleTextLabels() {
   toggleTextLabels()
   if (!TickClock.running()) render();
@@ -768,17 +785,26 @@ document.getElementById('modal-layout-button-load').addEventListener('click', _ 
   document.getElementById('modal-layout-load').style.display = 'none';
 })
 function toggleControlWindow(e) {
-  if (devPaneElem.classList.contains("hidden")) {
-    e.target.innerHTML = "Minimize Dev Pane";
-    devPaneControlSettingsElem.style.overflowY = "";
-    devPaneControlSettingsElem.classList.remove('disabled');
+  if (devPaneMinimizeButtonElem.classList.contains("minimized")) {
+    e.target.title = "Minimize Controls";
+    // devPaneControlSettingsElem.style.overflowY = "";
+    // devPaneControlSettingsElem.classList.remove('disabled');
   } else {
-    e.target.innerHTML = "Maximize Dev Pane";
-    devPaneControlSettingsElem.style.overflowY = "hidden";
-    devPaneControlSettingsElem.classList.add('disabled');
+    e.target.title = "Maximize Controls";
+    // devPaneControlSettingsElem.style.overflowY = "hidden";
+    // devPaneControlSettingsElem.classList.add('disabled');
   }
-  devPaneElem.classList.toggle("hidden");
-  devPaneControlSettingsElem.classList.toggle("hidden");
+  // devPaneElem.classList.toggle("minimized");
+  devPaneMinimizeButtonElem.classList.toggle('minimized');
+  // devPaneControlSettingsElem.classList.toggle("minimized");
+  devPaneControlDropdownsElem.classList.toggle("hidden");
+  toolboxButtonsElem.classList.toggle('hidden');
+}
+function toggleStepTick() {
+  if (TickClock.running()) {
+    document.getElementById('setting-item-updateToggle').classList.toggle("active");
+  }
+  TickClock.stepTick();
 }
 function clearPhysicsBalls() {
   physicsBalls.forEach(ball => ball.remove());
@@ -807,7 +833,7 @@ function handleToolboxClick(e) {
   if (!selectedTool) throw Error('Mouse tool target unknown.');
 
   e.target.className = "active";
-  toolboxDescriptionElem.innerHTML = selectedTool.description || "";
+  // toolboxDescriptionElem.innerHTML = selectedTool.description || "";
   LayoutManager.setPathfindingRoute([]);
   flushTestShapes();
 
@@ -823,33 +849,33 @@ let test_points = [];
 let test_lines = [];
 let test_circles = [];
 
-let contentOut = document.getElementById("content-output")
-let contentOutScrolling = false
-let contentOutTrackLastMouseMove = 0
-const CONTENT_OUT_SCROLL_SPEED = 1
-attachLogOut(contentOut)
-addLogSelectedNotifier(_ => {
-  if (!TickClock.running()) render();
-});
-contentOut.onmousemove = e => {
-  let offsetY = contentOut.offsetTop
-  contentOutTrackLastMouseMove = e.clientY - offsetY
-  contentOutScrolling = (e.clientY > offsetY + contentOut.offsetHeight - 30);
-}
-contentOut.onmouseleave = () => {
-  contentOutScrolling = false;
-}
-contentOut.onscroll = () => {
-  let y = contentOutTrackLastMouseMove + contentOut.scrollTop
-  let listItems = contentOut.children
-  for (let i = 0; i < listItems.length; i++) {
-    let listItem = listItems[i]
-    if (listItem.offsetTop < y && listItem.offsetTop + listItem.offsetHeight > y) {
-      listItem.dispatchEvent(new Event('mouseenter'))
-      break
-    }
-  }
-}
+// let contentOut = document.getElementById("content-output")
+// let contentOutScrolling = false
+// let contentOutTrackLastMouseMove = 0
+// const CONTENT_OUT_SCROLL_SPEED = 1
+// attachLogOut(contentOut)
+// addLogSelectedNotifier(_ => {
+//   if (!TickClock.running()) render();
+// });
+// contentOut.onmousemove = e => {
+//   let offsetY = contentOut.offsetTop
+//   contentOutTrackLastMouseMove = e.clientY - offsetY
+//   contentOutScrolling = (e.clientY > offsetY + contentOut.offsetHeight - 30);
+// }
+// contentOut.onmouseleave = () => {
+//   contentOutScrolling = false;
+// }
+// contentOut.onscroll = () => {
+//   let y = contentOutTrackLastMouseMove + contentOut.scrollTop
+//   let listItems = contentOut.children
+//   for (let i = 0; i < listItems.length; i++) {
+//     let listItem = listItems[i]
+//     if (listItem.offsetTop < y && listItem.offsetTop + listItem.offsetHeight > y) {
+//       listItem.dispatchEvent(new Event('mouseenter'))
+//       break
+//     }
+//   }
+// }
 
 function testLine(a, b, flush = false) {
   if (flush) test_lines = []
@@ -922,7 +948,7 @@ function update(dT) {
     physicsBalls = physicsBalls.filter(ball => !ball.garbage);
     _physicsBallGarbage = false;
   }
-  settingItemClearBallsElem.innerHTML = `Clear Physics Balls (${physicsBalls.length})`;
+  settingItemClearBallsElem.innerHTML = `Clear Balls (${physicsBalls.length})`;
 
   physicsBalls.forEach(ball => ball.update(dT));
 
@@ -977,12 +1003,10 @@ function render() {
     LayoutManager.constructionRender(canvasMasterContext);
   }
 
-  if (contentOutScrolling) contentOut.scrollTop += CONTENT_OUT_SCROLL_SPEED
+  // if (contentOutScrolling) contentOut.scrollTop += CONTENT_OUT_SCROLL_SPEED
 
   // Render physics debug line
-  if(mouse.selectedTool === MOUSE_TOOL.PHYSICS_DEBUGGER) {
-    physicsDebug.render(canvasMasterContext);
-  }
+  physicsDebug.render(canvasMasterContext);
 
   renderTestShapes()
 }
@@ -1058,11 +1082,11 @@ const handleKeyDown = keyDownEvent => {
       keyDownEvent.preventDefault()
       break;
     case KEY_CODE.ARROW_RIGHT:
-      TickClock.stepTick();
+      toggleStepTick()
       keyDownEvent.preventDefault()
       break;
     case KEY_CODE.TAB:
-      document.getElementById('setting-item-toggle-control-window').click();
+      document.getElementById('settings-minimize-button').click();
       keyDownEvent.preventDefault()
       break;
     case KEY_CODE.SPACEBAR:
@@ -1144,7 +1168,7 @@ function homeRefit() {
   document.getElementById('setting-item-input-damping-input').value = `${physicsBallDamping}`;
   document.getElementById('setting-item-input-elastic-input').value = `${physicsBallElastic}`;
 
-  document.getElementById('setting-item-toggle-control-window').click();
+  document.getElementById('settings-minimize-button').click();
   document.getElementById('setting-item-canvasOrigin').click();
   LayoutManager.setConstructionSnapDistance(MOUSE_TOOL.MESH_CONSTRUCTOR._snapDistance);
 }

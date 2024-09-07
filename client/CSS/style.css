@@ -1,0 +1,193 @@
+.content {
+  background-color: var(--color-foreground);
+  bottom: 0;
+  left: 0;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+}
+.content canvas {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+.hidden {
+  display: none !important;
+}
+.settings-dropdowns {
+  border: 1px solid transparent;
+  border-width: 0 1px;
+  display: flex;
+  height: 30px;
+  justify-content: right;
+  left: 10px;
+  list-style: none;
+  margin: 0 10px 0 0;
+  overflow-y: visible;
+  padding: 0;
+  position: absolute;
+  right: 30px;
+  top: 10px;
+  user-select: none;
+}
+.settings-dropdowns > * {
+  background-color: rgba(255, 255, 255, 0.65);
+  border: 1px solid lightgray;
+  color: grey;
+  cursor: pointer;
+  flex-basis: 170px;
+  font-size: 12px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  text-align: left;
+}
+.settings-dropdowns > *:hover,
+.settings-dropdowns > *.locked {
+  border: 1px solid grey;
+  height: fit-content;
+  overflow-y: visible;
+}
+.settings-dropdowns > *:hover > p,
+.settings-dropdowns > *.locked > p {
+  background-color: lightgrey;
+  background-image: url("../images/icon_unlock.png");
+}
+.settings-dropdowns > * > *:first-child {
+  background: none no-repeat left center / 16px;
+  background-image: none;
+  border-bottom: 1px solid lightgrey;
+  color: black;
+  height: 30px;
+  line-height: 30px;
+  margin: 0;
+  padding: 0 10px;
+  text-align: center;
+}
+.settings-dropdowns > * > *:first-child.locked {
+  background-image: url("../images/icon_lock.png");
+}
+.settings-dropdowns > * .setting-item-toggle {
+  background: url("../images/icon_settings@2x.png") no-repeat left center / 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  line-height: 26px;
+  margin: 6px 10px 6px 6px;
+  padding: 0 0 0 20px;
+}
+.settings-dropdowns > * .setting-item-toggle:hover {
+  text-decoration: underline;
+}
+.settings-dropdowns > * .setting-item-toggle.active {
+  background-image: url("../images/icon_settings_x@2x.png");
+}
+.settings-dropdowns > * .setting-item-button {
+  border-radius: 12px;
+  cursor: pointer;
+  line-height: 26px;
+  margin: 6px 10px 6px 6px;
+  padding: 0 0 0 20px;
+}
+.settings-dropdowns > * .setting-item-button:hover {
+  text-decoration: underline;
+}
+.settings-dropdowns > * .setting-item-input {
+  align-items: center;
+  display: flex;
+  height: 20px;
+  margin: 6px 6px 0 10px;
+}
+.settings-dropdowns > * .setting-item-input input {
+  width: 50px;
+}
+.settings-dropdowns > * .setting-item-input p {
+  margin-left: 4px;
+}
+.settings-dropdowns > * .setting-item-arrow {
+  display: inline-block;
+  height: 60px;
+  margin: 10px;
+}
+.settings-dropdowns > * .setting-item-arrow canvas {
+  background-color: white;
+  border-radius: 50%;
+  border: 1px solid grey;
+  cursor: pointer;
+  display: inline-block;
+  height: 60px;
+  padding: 0;
+  vertical-align: middle;
+  width: 60px;
+}
+.settings-dropdowns > * .setting-item-arrow p {
+  display: inline-block;
+  margin-left: 4px;
+}
+.settings-minimize-button {
+  background: "" no-repeat center / contain;
+  background-color: rgba(255, 255, 255, 0.65);
+  background-image: url("../images/icon_x.png");
+  border: 1px solid lightgray;
+  border-radius: 0 15px 0 0;
+  cursor: pointer;
+  height: 30px;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 30px;
+}
+.settings-minimize-button:hover {
+  background-color: lightgrey;
+}
+.settings-minimize-button.minimized {
+  background-image: url("../images/icon_plus.png");
+  border-radius: 15px 15px 15px 0;
+  border-width: 1px;
+}
+.settings-toolbox {
+  background-color: rgba(255, 255, 255, 0.65);
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 11px 0 0 0;
+  padding: 0;
+  position: absolute;
+  right: 10px;
+  top: 30px;
+}
+.settings-toolbox > * {
+  background: url("../images/icon_settings@2x.png") no-repeat center / 26px;
+  border: 1px solid lightgray;
+  cursor: pointer;
+  height: 30px;
+  width: 30px;
+}
+.settings-toolbox > *:last-child {
+  border-width: 1px;
+}
+.settings-toolbox > *.active {
+  border-color: black;
+  background-color: lightgray;
+}
+#settings-item-toolbox-pointer {
+  background-size: 55%;
+  background-image: url("../images/toolbox_icon_cursor_alt.svg");
+}
+#settings-item-toolbox-constructor {
+  background-image: url("../images/toolbox_icon_vertex_add.png");
+}
+#settings-item-toolbox-eraser {
+  background-image: url("../images/toolbox_icon_vertex_remove.png");
+}
+#settings-item-toolbox-pather {
+  background-image: url("../images/toolbox_icon_pathing.png");
+}
+#settings-item-toolbox-physcisDebugger {
+  background-image: url("../images/toolbox_icon_physics.png");
+}

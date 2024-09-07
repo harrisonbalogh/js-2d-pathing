@@ -1,83 +1,130 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta http-equiv="cache-control" content="no-cache, must-revalidate, post-check=0, pre-check=0" />
-    <meta http-equiv="cache-control" content="max-age=0" />
-    <meta http-equiv="expires" content="0" />
-    <meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT" />
-    <meta http-equiv="pragma" content="no-cache" />
-    <title>Harxer</title>
-    <link rel="stylesheet" type="text/css" href="CSS/base.css">
-    <link rel="stylesheet" type="text/css" href="CSS/home.css">
-    <link rel="icon" href="images/webIcon@2x.png">
-  </head>
 
-  <body>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta http-equiv="cache-control" content="no-cache, must-revalidate, post-check=0, pre-check=0" />
+  <meta http-equiv="cache-control" content="max-age=0" />
+  <meta http-equiv="expires" content="0" />
+  <meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT" />
+  <meta http-equiv="pragma" content="no-cache" />
+  <title>Harrison Balogh - JS 2D Engine</title>
+  <link rel="stylesheet" type="text/css" href="CSS/base.css">
+  <link rel="stylesheet" type="text/css" href="CSS/style.css">
+  <link rel="icon" href="images/webIcon@2x.png">
+</head>
 
-    <!-- ==================== CONTENT ==================== -->
+<body>
 
-    <div class="content" id="content">
-      <canvas id="bgCanvas"></canvas>
+  <!-- ==================== CONTENT ==================== -->
 
-      <div id="dev-pane">
-        <ul class="controls-settings" id="dev-pane-controls-settings">
-          <li class="setting-item-button" id="setting-item-toggle-control-window">Minimize Dev Pane</li>
-          <li class="control-setting-divider">RENDER</li>
-          <li class="setting-item-toggle" id="setting-item-canvasOrigin" title="Toggles display of the canvas origin point.">Origin</li>
-          <li class="setting-item-toggle" id="setting-item-renderIndicator" title="Toggles display of the top-left spinning render indicator.">Render Indicator</li>
-          <li class="setting-item-toggle" id="setting-item-mouseLabelToggle" title="Toggles display of mouse coordinates on canvas.">Mouse Label</li>
-          <li class="setting-item-toggle" id="setting-item-smearToggle" title="Toggles inter-frame canvas clearing. Canvas pixel drawing will overlay.">Smear</li>
-          <li class="setting-item-button" id="setting-item-centerCamera" title="Center view port on world origin.">Re-Center Camera</li>
-          <li class="control-setting-divider">MESH</li>
-          <li class="settings-item-toolbox">
-            <ul id="settings-item-toolbox-buttons">
-              <li id="settings-item-toolbox-pointer" title="Canvas Pointer tool"></li>
-              <li id="settings-item-toolbox-constructor" title="Mesh Construction tool"></li>
-              <li id="settings-item-toolbox-eraser" title="Mesh Destruction tool"></li>
-              <li id="settings-item-toolbox-pather" title="Mesh Pathing tool"></li>
-              <li id="settings-item-toolbox-physcisDebugger" title="Physics tool"></li>
-            </ul>
-            <p id="settings-item-toolbox-description"></p>
-          </li>
-          <li class="setting-item-button" id="setting-item-mesh-reset" title="Reverts polygon layout to page default.">Reset</li>
-          <li class="setting-item-button" id="setting-item-mesh-load" title="Opens layout JSON loader dialog. Use Print button below to get serialized layout.">Load</li>
-          <li class="setting-item-button" id="setting-item-mesh-print" title="Outputs current layout as JSON to console panel below. Copy this into Load dialog to save layouts.">Print</li>
-          <li class="control-setting-divider">TRIANGULATE</li>
-          <li class="setting-item-toggle" id="setting-item-triangulate-highlight-edges" title="Renders layout triangulation polygons.">Highlight Edges</li>
-          <!-- <li class="setting-item-toggle" id="setting-item-triangulate-optimize-pass">Optimization Pass</li> -->
-          <li class="control-setting-divider">PATHING</li>
-          <li class="setting-item-button" id="setting-item-randomPath" title="Sets a random start and finish destination for pathfinding.">Random Path</li>
-          <li class="control-setting-divider">PHYSICS</li>
-          <li class="setting-item-toggle active" id="setting-item-updateToggle" title="Toggles engine tick updates. Halts canvas rendering.">Engine Running</li>
-          <li class="setting-item-button" id="setting-item-stepTick" title="Moves clock by one tick. Pauses engine.">Step Tick</li>
-          <li class="setting-item-button" id="setting-item-clearBalls" title="Removes all current physics objects.">Clear Physics Objects</li>
-          <li class="setting-item-input" id="setting-item-input-damping">Damping</li>
-          <li class="setting-item-input" id="setting-item-input-elastic">Elastic</li>
-          <li class="setting-item-arrow" id="setting-item-arrow-gravity" title="Set direction of physics gravity.">Gravity</li>
-          <li class="control-setting-divider">CONSOLE</li>
-          <li class="setting-item-toggle active" id="setting-item-console-toggle" title="Toggles visibility of console text.">Displayed</li>
-          <li class="setting-item-button" id="setting-item-console-clear" title="Clears current console text.">Clear</li>
-          <li class="setting-item-toggle" id="setting-item-console-text-render" title="Toggles geometry text labels when rendering log data.">Text Labels</li>
-        </ul>
-        <ul class="content-divider" id="dev-pane-content-divider">...</ul>
-        <ul class="content-output" id="content-output">
-        </ul>
-      </div>
+  <div class="content" id="content">
+    <canvas id="main-canvas"></canvas>
 
-      <div class="modal" id="modal-layout-load">
-        <div>
-          <button class="modal-close" id="modal-layout-load-close">X</button>
-          <p>Serialized Layout JSON:</p>
-          <textarea title="JSON" id="modal-layout-load-input"></textarea >
-          <button id="modal-layout-button-load">Load</button>
+    <div class="settings-minimize-button" id="settings-minimize-button"></div>
+    <ul class="settings-dropdowns" id="settings-dropdowns">
+      <li>
+        <p>RENDER</p>
+        <div class="setting-item-toggle" id="setting-item-canvasOrigin"
+          title="Toggles display of the canvas origin point.">Origin</div>
+        <div class="setting-item-toggle" id="setting-item-mouseLabelToggle"
+          title="Toggles display of mouse coordinates on canvas.">Mouse Label</div>
+        <div class="setting-item-toggle" id="setting-item-smearToggle"
+          title="Toggles inter-frame canvas clearing. Canvas pixel drawing will overlay.">Smear</div>
+        <div class="setting-item-button" id="setting-item-centerCamera" title="Center view port on world origin.">
+          Re-Center Camera</div>
+      </li>
+      <li>
+        <p>MESH</p>
+        <div class="setting-item-button" id="setting-item-mesh-reset" title="Reverts polygon layout to page default.">
+          Reset</div>
+        <div class="setting-item-button" id="setting-item-mesh-load"
+          title="Opens layout JSON loader dialog. Use Print button below to get serialized layout.">Load</div>
+        <div class="setting-item-button" id="setting-item-mesh-print"
+          title="Outputs current layout as JSON to console panel below. Copy this into Load dialog to save layouts.">
+          Print</div>
+      </li>
+      <li>
+        <p>TRIANGULATE</p>
+        <div class="setting-item-toggle" id="setting-item-triangulate-highlight-edges"
+          title="Renders layout triangulation polygons.">Highlight Edges</div>
+      </li>
+      <li>
+        <p>PATHING</p>
+        <div class="setting-item-button" id="setting-item-randomPath"
+          title="Sets a random start and finish destination for pathfinding.">Random Path</div>
+      </li>
+      <li>
+        <p>PHYSICS</p>
+        <div class="setting-item-toggle active" id="setting-item-updateToggle"
+          title="Toggles engine tick updates. Halts canvas rendering.">Engine Running</div>
+        <div class="setting-item-toggle" id="setting-item-renderIndicator"
+          title="Toggles display of the top-left spinning render indicator.">Render Indicator</div>
+        <div class="setting-item-toggle" id="setting-item-collisionDebugger"
+          title="Toggles collision tester. Only usable with Physics tool active.">Collision Tester</div>
+        <div class="setting-item-button" id="setting-item-stepTick" title="Moves clock by one tick. Pauses engine.">Step
+          Tick</div>
+        <div class="setting-item-button" id="setting-item-clearBalls" title="Removes all current physics objects.">Clear
+          Physics Objects</div>
+        <div class="setting-item-input" id="setting-item-input-damping">Damping</div>
+        <div class="setting-item-input" id="setting-item-input-elastic">Elastic</div>
+        <div class="setting-item-arrow" id="setting-item-arrow-gravity" title="Set direction of physics gravity.">
+          Gravity</div>
+      </li>
+      <li>
+        <p>CONSOLE</p>
+        <div class="setting-item-toggle active" id="setting-item-console-toggle"
+          title="Toggles visibility of console text.">Displayed</div>
+        <div class="setting-item-button" id="setting-item-console-clear" title="Clears current console text.">Clear
         </div>
+        <div class="setting-item-toggle" id="setting-item-console-text-render"
+          title="Toggles geometry text labels when rendering log data.">Text Labels</div>
+      </li>
+    </ul>
+    <ul class="settings-toolbox" id="settings-toolbox">
+      <li id="settings-item-toolbox-pointer" title="Canvas Pointer tool
+          Left-click updates mesh context selection - indicated by blue highlight in the canvas.
+          The current mesh context has various affects on other tools. Left-click over a hole polygon
+          to change context. Left-click outside current context to change to parent polygon.
+          Drag right-click to pan canvas.
+          "></li>
+      <li id="settings-item-toolbox-constructor" title="Mesh Construction tool
+          Create new polygon by left-clicking to add vertices.
+          Close shape by overlaying first and last vertex. Undo vertices with right-click (no vertices is a pan).
+          Clockwise versus counter-clockwise affects generated mesh. Shape goes into current selected context.
+          If no polygons are present, the first polygon created has to be counter-clockwise.
+          "></li>
+      <li id="settings-item-toolbox-eraser" title="Mesh Destruction tool
+          Right-click hole mesh to delete polygon and all its child polygons. Right-click outside
+          bounding polygon (highest level context) to delete bounding polygon.
+          Left-click performs context selection like the Pointer tool.
+          "></li>
+      <li id="settings-item-toolbox-pather" title="Mesh Pathing tool
+          Left-click, and/or drag, to set the starting point. Right-click, and/or drag, to set the
+          destination point. Path is routed through current mesh context.
+          "></li>
+      <li id="settings-item-toolbox-physcisDebugger" title="Physics tool
+          Left-click, and/or drag, to spawn physics objects that will collide with the current mesh context.
+          "></li>
+    </ul>
+    <!-- <ul class="content-divider" id="dev-pane-content-divider">...</ul>
+        <ul class="content-output" id="content-output"> -->
+    <!-- </ul> -->
+
+    <div class="modal" id="modal-layout-load">
+      <div>
+        <button class="modal-close" id="modal-layout-load-close">X</button>
+        <p>Serialized Layout JSON:</p>
+        <textarea title="JSON" id="modal-layout-load-input"></textarea>
+        <button id="modal-layout-button-load">Load</button>
       </div>
     </div>
+  </div>
 
-    <!-- ==================== SCRIPTS ==================== -->
-    <script type='module' src='dist/main.js'></script>
+  <!-- ==================== SCRIPTS ==================== -->
+  <script type='module' src='dist/main.js'></script>
 
-  </body>
+</body>
 
 </html>
