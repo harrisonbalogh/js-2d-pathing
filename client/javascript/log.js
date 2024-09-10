@@ -29,20 +29,20 @@ export function disableLogging(val) {
   loggingDisabled = val
 }
 
-let contentOut = undefined
+let consoleOutput = undefined
 /**
  * Setup on-screen log out with a ul element for text output.
  *
  * @param {ul} list_element html element of list type to push text list items to
  */
 export function attachLogOut(list_element) {
-  contentOut = list_element
+  consoleOutput = list_element
 }
 
 export function clear() {
-  if (!contentOut) throw 'Logging was not configured with a list element with setup() call'
+  if (!consoleOutput) throw 'Logging was not configured with a list element with setup() call'
   setLogSelected(undefined);
-  contentOut.innerHTML = "";
+  consoleOutput.innerHTML = "";
   logData = []
 }
 
@@ -53,7 +53,7 @@ export function clear() {
  */
 export default function log(text, data, flush) {
   if (loggingDisabled) return
-  if (!contentOut) throw 'Logging was not configured with a list element with setup() call'
+  if (!consoleOutput) throw 'Logging was not configured with a list element with setup() call'
 
   // Optional(overloaded) parameter handling...
   if (!Array.isArray(data)) {
@@ -86,17 +86,21 @@ export default function log(text, data, flush) {
   }
   if (flush) {
     setLogSelected(undefined);
-    contentOut.innerHTML = "";
+    consoleOutput.innerHTML = "";
     logData = []
   }
-  contentOut.appendChild(li);
-  // console.log(text)
-  // contentOut
+  // Keep scroll at bottom
+  if ((consoleOutput.scrollTop + consoleOutput.offsetHeight >= consoleOutput.scrollHeight)) {
+    consoleOutput.appendChild(li);
+    consoleOutput.scrollTop += 1000;
+  } else {
+    consoleOutput.appendChild(li);
+  }
 }
 
 const getLogSelectedIndex = () => {
   if (logSelected === undefined) return undefined
-  let items = contentOut.children
+  let items = consoleOutput.children
   for (let c = 0; c < items.length; c++) {
     if (items[c] === logSelected) {
       return c
@@ -106,23 +110,23 @@ const getLogSelectedIndex = () => {
 export function selectLogPrev() {
   let c = getLogSelectedIndex()
   if (c === undefined || c == 0) return
-  contentOut.children[c - 1].dispatchEvent(new Event('mousedown'));
-  syncContentOutHeight(contentOut.children[c - 1])
+  consoleOutput.children[c - 1].dispatchEvent(new Event('mousedown'));
+  syncContentOutHeight(consoleOutput.children[c - 1])
 }
 
 export function selectLogNext() {
   let c = getLogSelectedIndex()
-  if (c === undefined || c == contentOut.children.length - 1) return
-  contentOut.children[c + 1].dispatchEvent(new Event('mousedown'));
-  syncContentOutHeight(contentOut.children[c+1])
+  if (c === undefined || c == consoleOutput.children.length - 1) return
+  consoleOutput.children[c + 1].dispatchEvent(new Event('mousedown'));
+  syncContentOutHeight(consoleOutput.children[c+1])
 }
 
 function syncContentOutHeight(child) {
-  let y = child.offsetTop - contentOut.offsetTop;
-  if (y - 2 * child.offsetHeight < contentOut.scrollTop) {
-    contentOut.scrollTop = y - 2 * child.offsetHeight;
-  } else if (y + child.offsetHeight > contentOut.scrollTop + contentOut.offsetHeight) {
-    contentOut.scrollTop = y + child.offsetHeight - contentOut.offsetHeight;
+  let y = child.offsetTop - consoleOutput.offsetTop;
+  if (y - 2 * child.offsetHeight < consoleOutput.scrollTop) {
+    consoleOutput.scrollTop = y - 2 * child.offsetHeight;
+  } else if (y + child.offsetHeight > consoleOutput.scrollTop + consoleOutput.offsetHeight) {
+    consoleOutput.scrollTop = y + child.offsetHeight - consoleOutput.offsetHeight;
   }
 }
 

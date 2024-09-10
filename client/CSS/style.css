@@ -19,8 +19,6 @@
   display: none !important;
 }
 .settings-dropdowns {
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
   border: 1px solid transparent;
   border-width: 0 1px;
   display: flex;
@@ -68,6 +66,8 @@
 }
 .settings-dropdowns > * {
   background-color: rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   border: 1px solid lightgray;
   color: grey;
   font-size: 12px;
@@ -167,6 +167,9 @@
   border-radius: 15px 15px 15px 0;
   border-width: 1px;
 }
+.settings-minimize-button.right-stack {
+  background-image: url("../images/icon_rightStack.png");
+}
 .settings-toolbox {
   background-color: rgba(255, 255, 255, 0.65);
   -webkit-backdrop-filter: blur(2px);
@@ -262,4 +265,104 @@
 }
 #modal-layout-load {
   display: none;
+}
+.console-container {
+  bottom: 10px;
+  display: flex;
+  height: 200px;
+  left: 10px;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  right: 10px;
+}
+.console-container.minimized {
+  height: unset;
+  right: unset;
+}
+.console-container.minimized .console-sidebar-container .console-minimize-button {
+  background-image: url("../images/icon_plus.png");
+  border-radius: 15px 0 15px 15px;
+}
+.console-container .console-sidebar-container {
+  height: 100%;
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  width: 30px;
+}
+.console-container .console-sidebar-container .console-sidebar-controls {
+  background-color: rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  border: 1px solid lightgray;
+  border-width: 1px 1px 0 1px;
+  display: flex;
+  flex-direction: column-reverse;
+  flex-grow: 1;
+  height: 30px;
+  width: 30px;
+}
+.console-container .console-sidebar-container .console-sidebar-controls > * {
+  cursor: pointer;
+  display: inline-block;
+  height: 30px;
+  width: 30px;
+}
+.console-container .console-sidebar-container .console-sidebar-controls #setting-item-console-clear {
+  background-image: url("../images/icon_trash.png");
+}
+.console-container .console-sidebar-container .console-sidebar-controls #setting-item-console-clear:hover {
+  background-image: url("../images/icon_trash_alt_dark.png");
+}
+.console-container .console-sidebar-container .console-sidebar-controls #setting-item-console-text-render {
+  background-image: url("../images/icon_textLabel_off.png");
+}
+.console-container .console-sidebar-container .console-sidebar-controls #setting-item-console-text-render:hover {
+  background-image: url("../images/icon_textLabel_off_alt.png");
+}
+.console-container .console-sidebar-container .console-sidebar-controls #setting-item-console-text-render.active {
+  background-image: url("../images/icon_textLabel.png");
+}
+.console-container .console-sidebar-container .console-sidebar-controls #setting-item-console-text-render.active:hover {
+  background-image: url("../images/icon_textLabel_alt.png");
+}
+.console-container .console-sidebar-container .console-minimize-button {
+  background-color: rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  background: "" no-repeat center / contain;
+  background-image: url("../images/icon_x.png");
+  border: 1px solid lightgray;
+  border-radius: 0 0 0 15px;
+  cursor: pointer;
+  display: inline-block;
+  flex-shrink: 0;
+  height: 30px;
+  width: 30px;
+}
+.console-container .console-sidebar-container .console-minimize-button:hover {
+  background-color: lightgray;
+}
+.console-container .console-output {
+  background-color: rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  border: 1px solid lightgray;
+  list-style: none;
+  flex-grow: 1;
+  margin: 0;
+  overflow-y: auto;
+  padding: 0;
+}
+.console-container .console-output > * {
+  border-bottom: 1px dashed lightgray;
+  font-size: 12px;
+  padding: 4px;
+}
+.console-container .console-output > *:last-child {
+  border-bottom: unset;
+}
+.console-container .console-output > *:hover {
+  background-color: lightgray;
 }

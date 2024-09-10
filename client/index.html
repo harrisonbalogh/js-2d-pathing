@@ -22,6 +22,17 @@
   <div class="content" id="content">
     <canvas id="main-canvas"></canvas>
 
+    <div class="console-container" id="console-container">
+      <div class="console-sidebar-container">
+        <div class="console-sidebar-controls" id="console-sidebar-controls">
+          <div id="setting-item-console-clear" title="Clear Logs"></div>
+          <div id="setting-item-console-text-render" title="Toggles geometry text labels when rendering log data."></div>
+        </div>
+        <div class="console-minimize-button" title="Minimize Logs" id="console-minimize-button"></div>
+      </div>
+      <ul class="console-output" id="console-output"></ul>
+    </div>
+
     <div class="settings-minimize-button" id="settings-minimize-button"></div>
     <ul class="settings-dropdowns" id="settings-dropdowns">
       <li>
@@ -34,8 +45,6 @@
         title="Toggles inter-frame canvas clearing. Canvas pixel drawing will overlay.">Smear</div>
         <div class="setting-item-button" id="setting-item-centerCamera" title="Center view port on world origin.">
           Re-Center Camera</div>
-        <div class="setting-item-toggle" id="setting-item-settingsAlignment"
-          title="Toggles display of settings in a vertical alignment.">Vertical Settings</div>
       </li>
       <li>
         <p>MESH</p>
@@ -74,15 +83,6 @@
         <div class="setting-item-arrow" id="setting-item-arrow-gravity" title="Set direction of physics gravity.">
           Gravity</div>
       </li>
-      <!-- <li>
-        <p>CONSOLE</p>
-        <div class="setting-item-toggle active" id="setting-item-console-toggle"
-          title="Toggles visibility of console text.">Displayed</div>
-        <div class="setting-item-button" id="setting-item-console-clear" title="Clears current console text.">Clear
-        </div>
-        <div class="setting-item-toggle" id="setting-item-console-text-render"
-          title="Toggles geometry text labels when rendering log data.">Text Labels</div>
-      </li> -->
     </ul>
     <ul class="settings-toolbox" id="settings-toolbox">
       <li id="settings-item-toolbox-pointer" title="Canvas Pointer tool
@@ -110,9 +110,6 @@
           Left-click, and/or drag, to spawn physics objects that will collide with the current mesh context.
           "></li>
     </ul>
-    <!-- <ul class="content-divider" id="dev-pane-content-divider">...</ul>
-        <ul class="content-output" id="content-output"> -->
-    <!-- </ul> -->
 
     <div class="modal" id="modal-layout-load">
       <div>

@@ -547,6 +547,7 @@ const toolboxButtonsElem = document.getElementById('settings-toolbox');
 const settingsMinimizeButtonElem = document.getElementById('settings-minimize-button')
 const settingsDropdownsElem = document.getElementById('settings-dropdowns');
 const settingItemClearBallsElem = document.getElementById('setting-item-clearBalls');
+const consoleMinimizeButtonElem = document.getElementById('console-minimize-button')
 
 /** Primary canvas element 2D context @type {CanvasRenderingContext2D} */
 const canvasMasterContext = canvasElem.getContext('2d');
@@ -562,13 +563,11 @@ Object.entries({
   'setting-item-collisionDebugger': toggleCollisionDebugger,
   'setting-item-mouseLabelToggle': toggleMouseLabel,
   'setting-item-canvasOrigin': toggleCanvasOrigin,
-  'setting-item-settingsAlignment': toggleVerticalSettings,
   'setting-item-renderIndicator': toggleRenderIndicator,
   'setting-item-smearToggle': toggleSmearRendering,
   'setting-item-triangulate-highlight-edges': toggleTriangulateHighlightEdges,
   // 'setting-item-triangulate-optimize-pass': _ => {},
-  // 'setting-item-console-text-render': toggleConsoleTextLabels,
-  // 'setting-item-console-toggle': toggleConsole
+  'setting-item-console-text-render': toggleConsoleTextLabels,
 }).forEach(([elemId, callback]) =>
   document.getElementById(elemId).addEventListener('click', e => {
     e.target.classList.toggle("active");
@@ -583,9 +582,10 @@ Object.entries({
   'setting-item-centerCamera': centerCamera,
   'setting-item-mesh-load': loadLayout,
   'setting-item-mesh-print': printLayout,
-  // 'setting-item-console-clear': clearConsole,
+  'setting-item-console-clear': clearConsole,
   'setting-item-randomPath': randomPath,
   'settings-minimize-button': toggleControlWindow,
+  'console-minimize-button': toggleConsoleWindow,
   'setting-item-stepTick': toggleStepTick,
   'setting-item-clearBalls': clearPhysicsBalls
 }).forEach(([elemId, callback]) =>
@@ -745,9 +745,6 @@ function toggleRenderIndicator() {
 function toggleCanvasOrigin() {
   canvasOriginIndicator = !canvasOriginIndicator;
 }
-function toggleVerticalSettings() {
-  settingsDropdownsElem.classList.toggle('align-vertical');
-}
 function toggleMouseLabel() {
   mouse.labelVisible = !mouse.labelVisible
 }
@@ -767,10 +764,6 @@ function randomPath() {
 function toggleTriangulateHighlightEdges() {
   LayoutManager.triangulationVisible(!LayoutManager.visibleTriangulation)
 }
-// function toggleConsole() {
-//   devPaneControlSettingsElem.style.height = '';
-//   devPaneControlSettingsElem.classList.toggle("max-height");
-// }
 function toggleConsoleTextLabels() {
   toggleTextLabels()
   if (!TickClock.running()) render();
@@ -785,20 +778,44 @@ document.getElementById('modal-layout-button-load').addEventListener('click', _ 
   document.getElementById('modal-layout-load').style.display = 'none';
 })
 function toggleControlWindow(e) {
+  // Currently minimized, go to right-stack
   if (settingsMinimizeButtonElem.classList.contains("minimized")) {
-    e.target.title = "Minimize Controls";
-    // devPaneControlSettingsElem.style.overflowY = "";
-    // devPaneControlSettingsElem.classList.remove('disabled');
-  } else {
-    e.target.title = "Maximize Controls";
-    // devPaneControlSettingsElem.style.overflowY = "hidden";
-    // devPaneControlSettingsElem.classList.add('disabled');
+    e.target.title = "Horizontal Controls";
+    settingsMinimizeButtonElem.classList.remove('minimized');
+    settingsMinimizeButtonElem.classList.add('right-stack');
+
+    settingsDropdownsElem.classList.remove("hidden");
+    toolboxButtonsElem.classList.remove('hidden');
   }
-  // devPaneElem.classList.toggle("minimized");
-  settingsMinimizeButtonElem.classList.toggle('minimized');
-  // devPaneControlSettingsElem.classList.toggle("minimized");
-  settingsDropdownsElem.classList.toggle("hidden");
-  toolboxButtonsElem.classList.toggle('hidden');
+  // Currently right-stacked, go to horizontal
+  else if (settingsMinimizeButtonElem.classList.contains("right-stack")) {
+    e.target.title = "Minimize Controls";
+    settingsMinimizeButtonElem.classList.remove('right-stack');
+    // Skip default: settingsMinimizeButtonElem.classList.add('horizontal');
+
+    settingsDropdownsElem.classList.add('align-vertical');
+  }
+  // Currently horizontal, go to minimized
+  else {
+    e.target.title = "Right-stack Controls";
+    // Skip default: settingsMinimizeButtonElem.classList.remove('horizontal');
+    settingsMinimizeButtonElem.classList.add('minimized');
+
+    settingsDropdownsElem.classList.remove('align-vertical');
+    settingsDropdownsElem.classList.add("hidden");
+    toolboxButtonsElem.classList.add('hidden');
+  }
+}
+function toggleConsoleWindow(e) {
+  if (consoleContainer.classList.contains("minimized")) {
+    consoleMinimizeButtonElem.title = "Minimize Logs";
+  } else {
+    consoleMinimizeButtonElem.title = "Show Logs";
+  }
+
+  consoleOutput.classList.toggle('hidden');
+  consoleSidebar.classList.toggle('hidden');
+  consoleContainer.classList.toggle('minimized');
 }
 function toggleStepTick() {
   if (TickClock.running()) {
@@ -849,25 +866,24 @@ let test_points = [];
 let test_lines = [];
 let test_circles = [];
 
-// let contentOut = document.getElementById("content-output")
-// let contentOutScrolling = false
-// let contentOutTrackLastMouseMove = 0
-// const CONTENT_OUT_SCROLL_SPEED = 1
-// attachLogOut(contentOut)
-// addLogSelectedNotifier(_ => {
-//   if (!TickClock.running()) render();
-// });
-// contentOut.onmousemove = e => {
-//   let offsetY = contentOut.offsetTop
-//   contentOutTrackLastMouseMove = e.clientY - offsetY
-//   contentOutScrolling = (e.clientY > offsetY + contentOut.offsetHeight - 30);
+let consoleContainer = document.getElementById("console-container");
+let consoleOutput = document.getElementById("console-output");
+let consoleSidebar = document.getElementById('console-sidebar-controls');
+attachLogOut(consoleOutput)
+addLogSelectedNotifier(_ => !TickClock.running() && render());
+// let _consoleIsScrolling = false;
+// let _consoleTrackLastMouseMove = 0;
+// consoleOutput.onmousemove = e => {
+//   let offsetY = consoleOutput.offsetTop
+//   _consoleTrackLastMouseMove = e.clientY - offsetY
+//   _consoleIsScrolling = (e.clientY > offsetY + consoleOutput.offsetHeight - 30);
 // }
-// contentOut.onmouseleave = () => {
-//   contentOutScrolling = false;
+// consoleOutput.onmouseleave = () => {
+//   _consoleIsScrolling = false;
 // }
-// contentOut.onscroll = () => {
-//   let y = contentOutTrackLastMouseMove + contentOut.scrollTop
-//   let listItems = contentOut.children
+// consoleOutput.onscroll = () => {
+//   let y = _consoleTrackLastMouseMove + consoleOutput.scrollTop
+//   let listItems = consoleOutput.children
 //   for (let i = 0; i < listItems.length; i++) {
 //     let listItem = listItems[i]
 //     if (listItem.offsetTop < y && listItem.offsetTop + listItem.offsetHeight > y) {
@@ -1003,7 +1019,7 @@ function render() {
     LayoutManager.constructionRender(canvasMasterContext);
   }
 
-  // if (contentOutScrolling) contentOut.scrollTop += CONTENT_OUT_SCROLL_SPEED
+  // if (_consoleIsScrolling) consoleOutput.scrollTop += 5
 
   // Render physics debug line
   physicsDebug.render(canvasMasterContext);
